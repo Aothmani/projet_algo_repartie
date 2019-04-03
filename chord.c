@@ -9,37 +9,68 @@
 #define TAGINIT 0;
 
 
-int find_finger(){
+int find_resp_finger(int * finger, int wanted)
+{
+	int i;
+	for (i = 0; i < M-1; i++){
+		if (finger[i] <= wanted)
+			return finger[i];
+	}
+	return finger[0];
 }
 
 /* A VERIFIER */
-int compare(int a, int b, int mod)
+/* Returns 1 if a <= b, 0 otherwise */
+int ring_compare(int a, int b, int mod)
 {
 	int n;
-	if(b >= a)
-		n = (b - a) % mod;
+	if (b >= a)
+		n = b - a;
 	else
-		n = b - (a % mod);
-	if(n >= 0 && n <= mod/2)
+		n = b - a + mod;
+	if (n >= 0 && n <= mod/2)
 		return 1;
 	else
 		return 0;
 }
 
+/* Sort function for qsort(). 
+ * @return: -1 if a < b
+ *           0 if a = b 
+ *           1 if a > b 
+ */ 
 int tri(const void * c, const void * d)
 {
 	const int * a = (const int *) c;
 	const int * b = (const int *) d;
-	if(*a == *b)
+	if (*a == *b)
 		return 0;
-	return (*a < *b) ? -1 : 1;
+	return (ring_compare(*a, *b, K)) ? -1 : 1;
+}
+
+void node()
+{
+	int cid, status, msg;
+	int fingers[M];
+	
+	
+	
+	MPI_Recv(&cid, 1, MPI_INT, 0, TAGINIT, MPI_COMMWORLD, &status);
+	MPI_Recv(&fingers, M, MPI_INT, 0, TAGINIT, MPI_COMMWORLD, &status);
+
+	MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
+	while(status.MPI_TAG != TAGSTOP){
+		
+		MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
+	}
+	
 }
 
 void simulateur(void)
 {
 	srand(getpid());
 
-	int id[NB_SITE], finger[NB_SITE][6], i, val, j, k;
+	int id[NB_SITE], finger[NB_SITE][M], i, val, j, k;
 	
 	memset(id, -1, NB_SITE);
 	memset(finger[0]; -1; M);
@@ -96,12 +127,11 @@ int main(int argc, char *argv[])
   
 	MPI_Comm_rank(MPI_COMM_WORLD, &rang);
   
-	if (rang == 0) {
+	if (rang == 0)
 		simulateur();
-	} else {
-		// TODO
-	}
-  
+	else 
+		node();
+	  
 	MPI_Finalize();
 	return 0;
 }
