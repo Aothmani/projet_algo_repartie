@@ -44,7 +44,7 @@ struct node {
  * @m size of finger table
  * @wanted wanted value
  */
-void find_resp_finger(const int* fingers, int m, int wanted);
+int find_resp_finger(const int* fingers, /*int m,*/ int wanted);
 
 int ring_compare(int a, int b, int m);
 
