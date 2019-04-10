@@ -22,6 +22,22 @@ enum Tags {
 
 #define SEND_INT(dest, tag, data) MPI_Send((void*)&data, 1, MPI_INT, dest, tag, MPI_COMM_WORLD)
 #define SEND_NINT(dest, tag, data, n) MPI_Send((void*)data, n, MPI_INT, dest, tag, MPI_COMM_WORLD)
+
+/* struct array - resizeable array */
+struct array {
+	size_t size;
+	int data[0];
+};
+
+/* struct node - description of a chord node */
+struct node {
+	int mpi_rank; 
+	int rank; /* id in the ring */
+	int next; /* chord id of the next node in the ring */
+	int leader; /* 1 if leader, 0 otherwise */
+	struct array fingers;
+};
+
 /*
  * find_finger - Determines the finger to which the request should be transmitted to
  * @fingers finger table
@@ -30,7 +46,7 @@ enum Tags {
  */
 void find_finger(const int* fingers, int m, int wanted);
 
-int ring_compare(void* a, void* b);
+int ring_compare(int a, int b, int m);
 
 
 #endif // CHORD_CONSTANTS
