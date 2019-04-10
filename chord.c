@@ -2,18 +2,18 @@
 #include <stdlib.h>
 #include <mpi.h>
 #include <math.h>
+#include "utils.h"
 
 #define NB_SITE 6 /* site simulateur inclus */
 #define M 6
 #define K 64
-#define TAGINIT 0;
 
 
-int find_resp_finger(int * finger, int wanted)
+int find_resp_finger(const int * finger, int wanted)
 {
 	int i;
 	for (i = 0; i < M-1; i++){
-		if (finger[i] <= wanted)
+		if (ring_compare(finger[i], wanted, K))
 			return finger[i];
 	}
 	return finger[0];
@@ -50,7 +50,9 @@ int tri(const void * c, const void * d)
 
 void node()
 {
-	int cid, status, msg;
+	/* cid : chord id, key : buffer, sent in a message, caller : initiatior */
+	int cid, key, caller, dest, wanted; 
+	MPI_Status status;
 	int fingers[M];
 	
 	
@@ -58,10 +60,53 @@ void node()
 	MPI_Recv(&cid, 1, MPI_INT, 0, TAGINIT, MPI_COMMWORLD, &status);
 	MPI_Recv(&fingers, M, MPI_INT, 0, TAGINIT, MPI_COMMWORLD, &status);
 
-	MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
-	while(status.MPI_TAG != TAGSTOP){
-		
-		MPI_Recv(&msg, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
+	/* Initialisation */
+	// TODO
+	
+	MPI_Recv(&key, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
+	while(status.MPI_TAG != TAGTERM){
+		switch (status.MPI_TAG){
+		case TAGSEARCH:
+			/* Receiving the caller's id for the answer */
+			MPI_Recv(&caller, 1, MPI_INT, status.MPI_SOURCE,
+				 TAGSEARCH, MPI_COMM_WORLD, &status);
+			
+			/* If this node is responsible of the key */
+			if (ring_compare(key, cid, K)){
+				dest = find_resp_finger(fingers, caller);
+				SEND_INT(dest, TAGFOUND, cid);
+				SEND_INT(dest, TAGFOUND, caller);
+
+			/* It's not the responsible node, transmit */	
+			} else {
+				dest = find_resp_finger(fingers, key);
+				SEND_INT(dest, TAGSEARCH, key);
+				SEND_INT(dest, TAGSEARCH, caller);
+			}
+			break;
+
+		case TAGFOUND:
+			MPI_Recv(&caller, 1, MPI_INT, status.MPI_SOURCE,
+				 TAGFOUND, MPI_COMM_WORLD, &status);
+			/* resp found, send terminate message to simulator */
+			if(caller == cid){
+				prinf("Caller found the node %d responsible of the key\n", key);
+				SEND_INT(0, TAGTERM, key);
+			/* this node is not the recipient, transmit */
+			} else {
+				dest = find_resp_finger(fingers, caller);
+				SEND_INT(dest, TAGFOUND, key);
+				SEND_INT(dest, TAGFOUND, caller);
+			}
+			break;
+
+		case TAGINIT:
+		        /* TODO : envoi TAGSEARCH a lui même ??? */
+		default:
+			printf("Error : unknown tag.\n");
+			break;
+		}
+		MPI_Recv(&key, 1, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMMWORLD, &status);
 	}
 	
 }
@@ -110,6 +155,10 @@ void simulateur(void)
 		MPI_Send(id[i], 1 MPI_INT, i, TAGINIT, MPI_COMM_WORLD);
 		MPI_Send(finger[i], M, MPI_INT, i, TAGINIT, MPI_COMM_WORLD);
 	}
+
+	val = rand() % K;
+	i = rand() % K;
+	SEND_INT(i, TAGINIT, val);
 	
 }
 
