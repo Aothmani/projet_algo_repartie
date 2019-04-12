@@ -31,7 +31,7 @@ int find_resp_finger(const int * finger, int wanted)
 int find_corresponding_mpi_id(int chord_id, int * associative_table)
 {
 	int i;
-	for(i = 0, i < NB_SITE, i++){
+	for(i = 0; i < NB_SITE; i++){
 		if(associative_table[i] == chord_id)
 			return associative_table[i];
 	}
@@ -70,7 +70,7 @@ int tri(const void * c, const void * d)
 void node()
 {
 	/* cid : chord id, key : buffer, sent in a message, caller : initiatior */
-	int cid, key, dest, wanted, chord_id, caller_chord;
+	int cid, key, dest, wanted, chord_id, caller_chord, i;
 	MPI_Status status;
 	int fingers[M], associative_table[NB_SITE];
 	
@@ -94,7 +94,7 @@ void node()
 			/* If this node is responsible of the key */
 			if (ring_compare(key, cid, K)){
 				chord_id = find_resp_finger(fingers, caller_chord);
-				if(chord_resp){
+				if(chord_id){
 					dest = find_corresponding_mpi_id(chord_id,
 									associative_table);
 					SEND_INT(dest, TAGFOUND, cid);
@@ -124,7 +124,7 @@ void node()
 			 * The init node received the resp id,
 			 * send terminate message to simulator
 			 */
-			if(caller == cid){
+			if(caller_chord == cid){
 				printf("Caller found the node %d responsible of the key\n", key);
 				SEND_INT(0, TAGTERM, key);
 
@@ -146,16 +146,22 @@ void node()
 			if(key == cid){
 				printf("Init : key wanted is the init node, no need for research.\n");
 			} else {
+				for(i = 0; i < M; i++)
+					printf("Finger[%d] = %d\n", i, fingers[i]);
+				
+				printf("Init key searched = %d\n", key);
 				chord_id = find_resp_finger(fingers, key);
+				printf("Calculated chord_id = %d\n", chord_id);
 				if(chord_id){
 					dest = find_corresponding_mpi_id(chord_id,
 									associative_table);
 					SEND_INT(dest, TAGSEARCH, key);
 					SEND_INT(dest, TAGSEARCH, cid);
 				} else {
-						printf("Error : chord_id not found.\n");
+						printf("init Error : chord_id not found.\n");
 				}
 			}
+			break;
 		default:
 			printf("Error : unknown tag.\n");
 			break;
@@ -169,22 +175,22 @@ void simulateur(void)
 {
 	srand(getpid());
 
-	int chord_id[NB_SITE];
-	int finger[NB_SITE][M], associative_table[NB_SITE][NB_SITE];
+	int chord_id[NB_SITE + 1];
+	int finger[NB_SITE + 1][M], associative_table[NB_SITE + 1][NB_SITE];
 	int i, val, j, k;
 	
-	memset(chord_id, -1, NB_SITE);
+	memset(chord_id, -1, NB_SITE + 1);
 
 	/* Initialisation des tables de finger et id chord */
-	for(i = 0; i < NB_SITE, i++){
+	for(i = 0; i < NB_SITE + 1; i++){
 		memset(finger[i], -1, M);
 		memset(associative_table[i], -1, NB_SITE);
 	}
 		
 	/* Calcul des id CHORD  */
-	for(i = 1; i < NB_SITE; i++){
+	for(i = 1; i < NB_SITE + 1; i++){
 		val = rand() % K;
-		for(j = 0; j < NB_SITE; j++){
+		for(j = 1; j < NB_SITE + 1; j++){
 			if(val == chord_id[j]){
 				val = rand() % 64;
 				j = 0;
@@ -192,42 +198,48 @@ void simulateur(void)
 		}
 		chord_id[i] = val;
 	}
-
-	qsort(&id, sizeof(id), sizeof(int), tri);
+	for (i = 0; i < NB_SITE + 1; i++)
+		printf("chord_id[%d] = %d\n", i, chord_id[i]);
+	printf("\n");
+	
+	qsort(chord_id + 1, NB_SITE, sizeof(int), tri);
+	for (i = 0; i <7; i++)
+		printf("chord_id[%d] = %d\n", i, chord_id[i]);
 	
 	/*
 	 * Calculation of the finger array and filling of the chord id array 
 	 * and associative table array
 	 *    
 	 */
-	for(i = 1; i < NB_SITE; i++){
+	for(i = 1; i < NB_SITE + 1; i++){
 		
 		/* Calcul de la finger table de i */
 		for(j = 0; j < M; j++){
-			val = id[i] + pow(2, j);
+			val = chord_id[i] + pow(2, j);
 			k = 1;
-			while(k < NB_SITE && mpi_id[k] < val){
+			while(k < NB_SITE && chord_id[k] < val){
 				k++;
 			}
 			if(j == NB_SITE) {
 				finger[i][j] = chord_id[1];
 				associative_table[i][1] = chord_id[1];
 			} else {
+				printf("%d\n", chord_id[k]);
 				finger[i][j] = chord_id[k];
 				associative_table[i][k] = chord_id[k];
 			}
 		}
 	}
 
-	for(i = 1; i < NB_SITE; i++){
+	for(i = 1; i < NB_SITE + 1; i++){
 		SEND_INT(i, TAGINIT, chord_id[i]);
 		SEND_NINT(i, TAGINIT, finger[i], M);
 		SEND_NINT(i, TAGINIT, associative_table[i], NB_SITE);
 	}
 
 	val = rand() % K;
-	while ((i = rand() % M) == val){}
-	SEND_INT(chord_id[i], TAGINIT, val);
+	i = rand() % M;
+	SEND_INT(i, TAGINIT, val);
 
 	
 }
@@ -248,7 +260,7 @@ int main(int argc, char *argv[])
   
 	if (rang == 0)
 		simulateur();
-	else 
+	else
 		node();
 	  
 	MPI_Finalize();

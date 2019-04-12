@@ -32,7 +32,7 @@ struct array {
 struct node_addr {
 	int mpi;
 	int chord;
-}
+};
 
 /* struct node - description of a chord node */
 	struct node {
