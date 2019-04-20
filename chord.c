@@ -163,8 +163,6 @@ void simulateur(void)
 	for(i = 1; i < NB_SITE; i++){
 		SEND_INT(i, TAGINIT, id[i]);
 		SEND_INT(i, TAGINIT, finger[i]);	
-		//MPI_Send(id[i], 1, MPI_INT, i, TAGINIT, MPI_COMM_WORLD);
-		//MPI_Send(finger[i], M, MPI_INT, i, TAGINIT, MPI_COMM_WORLD);
 	}
 
 	val = rand() % K;
