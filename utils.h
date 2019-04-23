@@ -112,15 +112,6 @@ struct node {
 	struct array *fingers;
 };
 
-/* struct node - description of a chord node */
-	struct node {
-		int mpi_rank; 
-		int rank; /* id in the ring */
-		int next; /* chord id of the next node in the ring */
-		int leader; /* 1 if leader, 0 otherwise */
-		struct array fingers;
-	};
-
 /*
  * find_finger - Determines the finger to which the request should be 
  * transmitted to
@@ -128,7 +119,6 @@ struct node {
  * @m size of finger table
  * @wanted wanted value
  */
-int find_resp_finger(const int* fingers, /*int m,*/ int wanted);
 
 int ring_compare(int a, int b, int m);
 
