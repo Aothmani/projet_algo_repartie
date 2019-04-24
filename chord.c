@@ -15,7 +15,7 @@ int find_resp_finger(const int * finger, int wanted, int cid)
 {
 	int i;
 	for (i = M-1; i >= 0; i--){
-		if (finger[i] != cid && (finger[i] == wanted || ring_compare(finger[i], wanted, K)))
+		if (finger[i] != cid && (finger[i] == wanted || inInterval(finger[i], cid, wanted)))
 			return finger[i];
 	}
 	return finger[0];
@@ -36,6 +36,15 @@ int find_corresponding_mpi_id(int chord_id, int * associative_table)
 			return i;
 	}
 	return 0;
+}
+
+int inInterval(int n, int a, int b)
+{
+	if (a < b)
+		return (n >= a && n < b);
+	else
+		return ((n >= a && n < K) || (n >= 0 && n < b));
+			
 }
 
 /* Returns 1 if a <= b, 0 otherwise */
@@ -92,11 +101,12 @@ void node(int rank)
 						
 			/* If this node is responsible of the key */
 			if (ring_compare(key, cid, K)){
-				printf("Node %d is responsible for the key %d\n", cid, key);
+				printf("\nNode %d is responsible for the key %d\n\n", cid, key);
 				chord_id = find_resp_finger(fingers, caller_chord, cid);
 				dest = find_corresponding_mpi_id(chord_id,
 								 associative_table);
 				printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
+				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 				SEND_INT(dest, TAGFOUND, cid);
 				SEND_INT(dest, TAGFOUND, caller_chord);
 	        				
@@ -120,7 +130,7 @@ void node(int rank)
 			 * send terminate message to simulator
 			 */
 			if(caller_chord == cid){
-				printf("Node %d : received node number %d responsible for the key. End of algorithm\n", cid, key);
+				printf("Node %d : received node number %d responsible for the key. End of algorithm\n\n", cid, key);
 				SEND_INT(0, TAGTERM, key);
 
 				/* this node is not the recipient, transmit */
@@ -128,6 +138,7 @@ void node(int rank)
 				chord_id = find_resp_finger(fingers, caller_chord, cid);
 				dest = find_corresponding_mpi_id(chord_id,
 								 associative_table);
+				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 				SEND_INT(dest, TAGFOUND, key);
 				SEND_INT(dest, TAGFOUND, caller_chord);
 			}
@@ -189,14 +200,18 @@ void simulateur(void)
 		}
 		chord_id[i] = val;
 	}
+
+	printf("\nChord id array :\n\n");
 	for (i = 0; i < NB_SITE + 1; i++)
 		printf("chord_id[%d] = %d\n", i, chord_id[i]);
 	printf("\n");
 	
 	qsort(chord_id + 1, NB_SITE, sizeof(int), tri);
+
+	printf("Sorted chord id array :\n\n");
 	for (i = 0; i <7; i++)
 		printf("chord_id[%d] = %d\n", i, chord_id[i]);
-	
+	printf("\n");
 	/*
 	 * Calculation of the finger array and filling of the chord id array 
 	 * and associative table array
