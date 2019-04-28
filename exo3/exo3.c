@@ -133,7 +133,7 @@ void node(int rank)
 				printf("Node %d : received node number %d responsible for the key. End of algorithm\n\n", cid, key);
 				SEND_INT(0, TAGTERM, key);
 
-				/* this node is not the recipient, transmit */
+			/* this node is not the recipient, transmit */
 			} else {
 				chord_id = find_resp_finger(fingers, caller_chord, cid);
 				dest = find_corresponding_mpi_id(chord_id,
@@ -229,7 +229,6 @@ void simulateur(void)
 				if (chord_id[k] < tmp && chord_id[k] >= val){
 					tmp = chord_id[k];
 					l = k;
-					//	printf("tmp : %d, chord_id : %d, val : %d\n", tmp, chord_id[k], val);
 				}
 				if (chord_id[k] < min){
 					min = chord_id[k];
