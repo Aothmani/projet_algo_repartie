@@ -17,7 +17,7 @@
 		b = swap_#a#b;}
 
 
-inline void swap(int *a, int *b)
+void swap(int *a, int *b)
 {
 	int c;
 	c = *b;
@@ -25,7 +25,7 @@ inline void swap(int *a, int *b)
 	*a = c;
 }
 
-inline void sequence_array(int *arr, size_t len)
+void sequence_array(int *arr, size_t len)
 {
 	size_t i;
 	for (i = 0; i < len; i++) {
@@ -42,6 +42,11 @@ void init_node(struct node *node)
 
 void print_fingers(struct node_addr* fingers, int len)
 {
+	int i;
+	for (i = 0; i < len; i++) {
+		printf("%d ", fingers[i].chord);
+	}
+	printf("\n");
 }
 
 void node(int rank)
@@ -52,20 +57,27 @@ void node(int rank)
 	int elect_state, leader = -1;
 	int msize;
 	int reception = 0;
+	struct node_addr addr;
+	
 	node.mpi_rank = rank;
 	node.leader = 0;
 	node.fingers = malloc(sizeof(struct node_addr) * M);
 	node.fingers->size = M;
-
+	
 	memset(node.fingers->data, 0, sizeof(struct node_addr) * M);
 	
 	init_node(&node);
 
+	addr.chord = node.rank;
+	addr.mpi = node.mpi_rank;
+	
 	if (node.leader) {
 		election(rank, NEXT(rank, M));
 		elect_state = ELECT_CANDIDATE;
 	}
 
+	
+	
 	next = NEXT(rank, M);
 	while (!reception) {
 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -74,11 +86,12 @@ void node(int rank)
 			receive_elect(&node, next, &elect_state, &leader);
 			break;
 		case TAGTAB:
-			receive_tab(next, elect_state == ELECT_LEADER ? 1 : 0);
+			receive_tab(&addr, next,
+				    elect_state == ELECT_LEADER ? 1 : 0);
 			break;
 		case TAGTABANN:
-			receive_tabann(rank, next, leader, fingers, M,
-				       &reception);
+			receive_tabann(rank, next, leader, node.fingers->data,
+				       M, &reception);
 			break;
 		}
 	}
@@ -137,7 +150,7 @@ int main(int argc, char *argv[])
 	if (rank == 0)
 		simulator();
 	else 
-		node();
+		node(rank);
 	  
 	MPI_Finalize();
 	return 0;

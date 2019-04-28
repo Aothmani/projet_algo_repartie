@@ -4,10 +4,10 @@
 #include "utils.h"
 
 enum ElectState {
-		 ELECT_CANDIDATE,
-		 ELECT_LEADER,
-		 ELECT_LOST,
-		 ELECT_NOTCANDIDATE
+		 ELECT_CANDIDATE, /* node is candidate for leadership */
+		 ELECT_LEADER, /* node has been elected as leader */
+		 ELECT_LOST, /* node lost the election */
+		 ELECT_NOTCANDIDATE /* node isn't candidate */
 };
 
 /* 
@@ -28,10 +28,12 @@ void receive_elect(struct node *node, int next, int *elect_state, int *leader);
  * ids of the nodes in the network.
  * Otherwise, the current node will simply pass add its CHORD id to the array 
  * and transmit it to the next node.
+ * @addr address of current node
  * @next MPI rank of next node in the ring
  * @leader 1 if current node is leader, 0 otherwise
  */
-void receive_tab(int next, int leader);
+void receive_tab(struct node_addr* addr, int next, int leader);
+
 
 /* receive_tabann - handle the reception of a TAGTABANN message and calculate 
  * the finger table of the current node 

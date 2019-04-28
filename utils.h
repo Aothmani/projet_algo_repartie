@@ -40,16 +40,15 @@ enum Tags {
 #define NEXT(rank, size) ((rank + 1) % size)
 #define PREV(rank, size) ((rank - 1 + size) % size)
 
+struct node_addr {
+	int mpi;
+	int chord;
+};
 
 /* struct array - resizeable array */
 struct array {
 	size_t size;
-	int data[0];
-};
-
-struct node_addr {
-	int mpi;
-	int chord;
+	struct node_addr data[0];
 };
 
 inline void receive_addr(int tag, struct node_addr* addr)
@@ -62,25 +61,6 @@ inline void receive_addr(int tag, struct node_addr* addr)
 	addr->mpi = data[1];
 }
 
-inline void receive_addr_array(int tag, struct node_addr* addr_arr, int len)
-{
-	MPI_Status status;
-	int i;
-	int *data;
-	data = malloc(sizeof(int) * 2 * len);
-	
-	MPI_Probe(MPI_ANY_SOURCE, tag, MPI_COMM_WORLD, &status);
-	MPI_Recv(data, len, MPI_INT, MPI_ANY_SOURCE, tag, MPI_COMM_WORLD,
-		 &status);
-	
-	for (i = 0; i < len; i++) {
-		addr_arr[i].mpi = data[2 * i];
-		addr_arr[i].chord = data[2 * i + 1];
-	}
-
-	free(data);
-}
-
 inline void send_addr(int dest, int tag, struct node_addr* addr)
 {
 	int data[2];
@@ -89,19 +69,9 @@ inline void send_addr(int dest, int tag, struct node_addr* addr)
 	MPI_Send(data, 2, MPI_INT, dest, tag, MPI_COMM_WORLD);
 }
 
-inline void send_addr_array(int dest, int tag, struct node_addr* addr_array,
-			    int len)
-{
-	int *data;
-	int i;
-	data = malloc(sizeof(int) * 2 * len);
-	for (i = 0; i < len; i++) {
-		data[2 * i] = addr_array[i].mpi;
-		data[2 * i + 1] = addr_array[i].chord;
-	}
-	MPI_Send(data, 2 * len, MPI_INT, dest, tag, MPI_COMM_WORLD);
-	free(data);
-}
+void receive_addr_array(int tag, struct node_addr* addr_arr, int len);
+void send_addr_array(int dest, int tag, struct node_addr* addr_array,
+		     int len);
 
 /* struct node - description of a chord node */
 struct node {
@@ -111,15 +81,6 @@ struct node {
 	int leader; /* 1 if leader, 0 otherwise */
 	struct array *fingers;
 };
-
-/* struct node - description of a chord node */
-	struct node {
-		int mpi_rank; 
-		int rank; /* id in the ring */
-		int next; /* chord id of the next node in the ring */
-		int leader; /* 1 if leader, 0 otherwise */
-		struct array fingers;
-	};
 
 /*
  * find_finger - Determines the finger to which the request should be 
