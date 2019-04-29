@@ -37,7 +37,9 @@ void init_node(struct node *node)
 {
 	MPI_Status status;
 	MPI_Recv(&node->rank, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
-	MPI_Recv(&node->next, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
+	receive_addr(TAGINIT, &node->next_addr);
+	MPI_Recv(&node->leader, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD,
+		 &status);
 }
 
 void print_fingers(struct node_addr* fingers, int len)
@@ -49,15 +51,20 @@ void print_fingers(struct node_addr* fingers, int len)
 	printf("\n");
 }
 
+void print_array(struct array* arr) {
+        print_fingers(arr->data, arr->size);
+}
+
 void node(int rank)
 {
 	struct node node;
 	int next;
 	MPI_Status status;
 	int elect_state, leader = -1;
-	int msize;
 	int reception = 0;
 	struct node_addr addr;
+
+	printf("P%d> Starting node\n", rank);
 	
 	node.mpi_rank = rank;
 	node.leader = 0;
@@ -68,33 +75,45 @@ void node(int rank)
 	
 	init_node(&node);
 
+	printf("P%d> Chord rank = %d, next = (%d, %d)\n",
+	       rank, node.rank, node.next_addr.mpi, node.next_addr.chord);
+	
 	addr.chord = node.rank;
 	addr.mpi = node.mpi_rank;
 	
 	if (node.leader) {
-		election(rank, NEXT(rank, M));
+		printf("P%d> Is leader\n", rank);
+		election(rank, node.next_addr.mpi);
 		elect_state = ELECT_CANDIDATE;
 	}
 
-	
-	
-	next = NEXT(rank, M);
 	while (!reception) {
 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+		printf("P%d> Received message from %d, tag = ",
+		       rank, status.MPI_SOURCE);
 		switch (status.MPI_TAG) {
 		case TAGELECT:
-			receive_elect(&node, next, &elect_state, &leader);
+			printf("TAGELECT\n");
+			receive_elect(&node, &elect_state,
+				      &leader);
 			break;
 		case TAGTAB:
-			receive_tab(&addr, next,
+			printf("TAGTAB\n");
+			receive_tab(&addr, &node.next_addr,
 				    elect_state == ELECT_LEADER ? 1 : 0);
 			break;
 		case TAGTABANN:
-			receive_tabann(rank, next, leader, node.fingers->data,
-				       M, &reception);
+			printf("TAGTABANN\n");
+			receive_tabann(&node, elect_state, &reception);
+			break;
+		default:
+			printf("Undefined message tag\n");
 			break;
 		}
 	}
+	printf("P%d> finger table: ", rank);
+	print_array(node.fingers);
+	
 	free(node.fingers);
 }
 
@@ -109,25 +128,41 @@ void shuffle(int *arr, size_t len)
 }
 
 
-
 void simulator(void)
 {
 	int mpi_ranks[M] = {1, 2, 3, 4, 5, 6};
 	int chord_ids[M];
-        int i;
-	int next;
+        int i, next;
+	int leader;
+	int one = 1, zero = 0;
+	struct node_addr next_addr;
 
+	printf("Starting simulator process\n");
+	
 	/* Randomize chords ids */
 	sequence_array(chord_ids, M);
 	shuffle(chord_ids, M);
+
+	printf("Simulator, shuffle => ");
+	for (i = 0; i < M; i++) {
+		printf("(%d, %d), ", mpi_ranks[i], chord_ids[i]);
+	}
+	printf("\n");
+
+	leader = rand() % M;
 	
 	/* Send chords ids and mpi ids for next nodes */
 	for (i = 0; i < M; i++) {
-		SEND_INT(mpi_ranks[i], TAGINIT, chord_ids + i);
+		SEND_INT(mpi_ranks[i], TAGINIT, chord_ids[i]);
 		next = (i + 1) % M;
-		SEND_INT(mpi_ranks[i], TAGINIT, next);
-	}
-	
+		next_addr.mpi = next + FIRST_NODE;
+		next_addr.chord = chord_ids[next];
+		send_addr(mpi_ranks[i], TAGINIT, &next_addr);
+		if (i == leader)
+			SEND_INT(mpi_ranks[i], TAGINIT, one);
+		else
+			SEND_INT(mpi_ranks[i], TAGINIT, zero);
+	}	
 }
 
 

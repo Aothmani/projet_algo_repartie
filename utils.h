@@ -40,6 +40,9 @@ enum Tags {
 #define NEXT(rank, size) ((rank + 1) % size)
 #define PREV(rank, size) ((rank - 1 + size) % size)
 
+/* mpi rank of the first non-simulator node */
+#define FIRST_NODE 1 
+
 struct node_addr {
 	int mpi;
 	int chord;
@@ -51,25 +54,10 @@ struct array {
 	struct node_addr data[0];
 };
 
-inline void receive_addr(int tag, struct node_addr* addr)
-{
-	int data[2];
-	MPI_Status status;
-	MPI_Recv(data, 2, MPI_INT, tag, MPI_ANY_SOURCE, MPI_COMM_WORLD,
-		 &status);
-	addr->chord = data[0];
-	addr->mpi = data[1];
-}
+void receive_addr(int tag, struct node_addr* addr);
+void send_addr(int dest, int tag, struct node_addr* addr);
 
-inline void send_addr(int dest, int tag, struct node_addr* addr)
-{
-	int data[2];
-	data[0] = addr->mpi;
-	data[1] = addr->chord;
-	MPI_Send(data, 2, MPI_INT, dest, tag, MPI_COMM_WORLD);
-}
-
-void receive_addr_array(int tag, struct node_addr* addr_arr, int len);
+void receive_addr_array(int tag, struct node_addr* addr_arr, int *len);
 void send_addr_array(int dest, int tag, struct node_addr* addr_array,
 		     int len);
 
@@ -77,7 +65,7 @@ void send_addr_array(int dest, int tag, struct node_addr* addr_array,
 struct node {
 	int mpi_rank; 
 	int rank; /* id in the ring */
-	int next; /* chord id of the next node in the ring */
+        struct node_addr next_addr; /* next node in the ring */
 	int leader; /* 1 if leader, 0 otherwise */
 	struct array *fingers;
 };

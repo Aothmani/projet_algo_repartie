@@ -1,6 +1,7 @@
 #include "election.h"
 
 #include <stdlib.h>
+#include <stdio.h>
 
 #include "election.h"
 #include "utils.h"
@@ -11,28 +12,29 @@ void election(int rank, int next)
 	SEND_INT(next, TAGELECT, rank);
 }
 
-void receive_elect(struct node *node, int next, int *elect_state, int *leader)
+void receive_elect(struct node *node, int *elect_state, int *leader)
 {
 	int j;
 	MPI_Status status;
-	int rank = node->mpi_rank;
+	int mpi_rank = node->mpi_rank;
 	struct node_addr addr;
-	addr.mpi = rank;
-	addr.chord = node->rank;
+	addr.mpi = mpi_rank;
+	addr.chord = node->mpi_rank;
 	
 	MPI_Recv(&j, 1, MPI_INT, MPI_ANY_SOURCE, TAGELECT, MPI_COMM_WORLD,
 		 &status);
 	
-	if (rank > j) {
+	if (mpi_rank > j) {
 		if (*elect_state == ELECT_NOTCANDIDATE)
 			*elect_state = ELECT_CANDIDATE;
-	} else if (rank < j) {
+		SEND_INT(node->next_addr.mpi, TAGELECT, mpi_rank);
+	} else if (mpi_rank < j) {
 		*elect_state = ELECT_LOST;
 		*leader = j;
-		SEND_INT(next, TAGELECT, j);
+		SEND_INT(node->next_addr.mpi, TAGELECT, j);
 	} else {
 		*elect_state = ELECT_LEADER;
-		send_addr_array(next, TAGTAB, &addr, 1);
+		send_addr_array(node->next_addr.mpi, TAGTAB, &addr, 1);
 	}
 }
 
@@ -54,47 +56,62 @@ int __compare_addr(const void *a, const void *b)
 	return c->chord < d->chord ? -1 : 1;
 }
 
-void receive_tab(struct node_addr* addr, int next, int leader)
+void receive_tab(struct node_addr* addr, struct node_addr* next, int leader)
 {
 	struct node_addr *tab;
 	MPI_Status status;
 	int msize;
-
-	MPI_Probe(MPI_ANY_SOURCE, TAGTABANN, MPI_COMM_WORLD, &status);
+	int i;
+	
+	MPI_Probe(MPI_ANY_SOURCE, TAGTAB, MPI_COMM_WORLD, &status);
 	MPI_Get_count(&status, MPI_INT, &msize);
-	tab = malloc((msize + 1) * sizeof(struct node_addr));
-	receive_addr_array(TAGTAB, tab, msize);
+	tab = malloc((msize + 1) * sizeof(int));
+	receive_addr_array(TAGTAB, tab, &msize);
+
+	printf("P%d> msize = %d, tab = [", addr->mpi, msize);
+	for (i = 0; i < msize; i++) {
+		printf("(%d, %d), ", tab[i].mpi, tab[i].chord);
+	}
+	printf("]\n");
 	
 	if (leader) {
 		qsort((void*)tab, msize, sizeof(struct node_addr),
 		      __compare_addr);
-		send_addr_array(next, TAGTABANN, tab, msize);
+		send_addr_array(next->mpi, TAGTABANN, tab, msize);
 	} else {
 		tab[msize] = *addr;
-		send_addr_array(next, TAGTABANN, tab, msize);
+		msize++;
+		send_addr_array(next->mpi, TAGTAB, tab, msize);
 	}
 	free(tab);
 }
 
-void receive_tabann(int rank, int next, int leader,
-		    struct node_addr* fingers, int fingerCnt, int *reception)
+void receive_tabann(struct node* node, int leader, int *reception)
 {
 	struct node_addr *tab;
 	int msize;
+	int i;
 	MPI_Status status;
 	
 	MPI_Probe(MPI_ANY_SOURCE, TAGTABANN, MPI_COMM_WORLD, &status);
 	MPI_Get_count(&status, MPI_INT, &msize);
 	
-	tab = malloc(msize * sizeof(struct node_addr));
-	receive_addr_array(TAGTABANN, tab, msize);
-	
-	if (leader) {
-		*reception = 1;
-	} else {
-		send_addr_array(next, TAGTABANN, tab, msize);
+	tab = malloc(msize * sizeof(int));
+	receive_addr_array(TAGTABANN, tab, &msize);
+
+	printf("P%d> msize = %d, tab = [", node->mpi_rank, msize);
+	for (i = 0; i < msize; i++) {
+		printf("(%d, %d), ", tab[i].mpi, tab[i].chord);
 	}
-	calc_fingers(rank, tab, msize, fingers, fingerCnt);
+	printf("]\n");
+
+	
+	*reception = 1;
+	if (leader != ELECT_LEADER) {
+		send_addr_array(node->next_addr.mpi, TAGTABANN, tab, msize);
+	}
+	calc_fingers(node->mpi_rank, tab, msize, node->fingers->data,
+		     node->fingers->size);
 
 	free(tab);
 }
@@ -105,6 +122,7 @@ void calc_fingers(int rank, struct node_addr* tab, int size,
 	int posp = 0, pos = 0, prev;
 	int i, fi = 0;
 	int htableSize = (1 << fingerCnt); /* 2^fingerCnt */
+	int fingerOffset;
 	
 	/* 
 	 * Find the position of the current node inside the array that contains 
@@ -117,15 +135,30 @@ void calc_fingers(int rank, struct node_addr* tab, int size,
 		}
 	}
 
+	printf("P%d> calc_fingers - size = %d\n", rank, size);
+	
 	/* TODO: Check algorithm */
 	pos = (posp + 1) % size; /* id of next node */
+	fingerOffset = 1;
+	while (fi < fingerCnt) {	       
+		while (tab[i].chord > (posp + fingerOffset) % htableSize) {
+			prev = ((pos - 1) + size) % size;
+			fingers[fi] = tab[prev];
+			fi++;
+			fingerOffset <<= 1;			
+		}
+		pos = (pos + 1) % size;
+	}
+
+
 	
 	while (ring_compare(pos, posp, htableSize)) {
+		/* check if the node is in the finger table */
 		if (tab[pos].chord > (pos + htableSize) % size) {
 			prev = ((pos - 1) + size) % size;
 			fingers[fi] = tab[prev];
 			fi++;
 		}
-		pos++;
+		pos = (pos + 1) % size;
 	}
 }
