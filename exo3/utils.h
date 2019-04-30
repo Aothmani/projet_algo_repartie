@@ -8,13 +8,14 @@ enum Tags {
 	TAGINIT, /* Sent by the simulator to define the variables */
 	TAGSEARCH, /* Searching a value in the hash table */
 	TAGFOUND, /* Sending back the result of the search */
+	TAGANSWER,
 	TAGELECT, /* Choosing a leader for the election */
 	TAGANN, /* Annoucing the leader at the end of the election */
 	TAGTAB, /* Collecting all the node ids */
 	TAGTABANN, /* Broadcasting the completed table with all the node ids */
 	TAGINS, /* Insert a node in the ring */
-	TAGTELLFINGER, /* Searching for a finger */
-	TAGTELLFINGERRESP, /* Response to TAGTELLFINGER from the new finger */
+	TAGASKFINGER, /* Searching for a finger */
+	TAGASKFINGERRESP, /* Response to TAGTELLFINGER from the new finger */
 	TAGUPDATE, /* Tell a node to update its fingers in regards to the newly inserted node */
 	TAGUPDATERESP, /* Response to TAGTELLFINGER, contains the new finger */
 	TAGINSERT, /* Insert a node in the ring */

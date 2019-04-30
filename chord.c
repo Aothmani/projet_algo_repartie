@@ -15,7 +15,7 @@ int find_resp_finger(const int * finger, int wanted, int cid)
 {
 	int i;
 	for (i = M-1; i >= 0; i--){
-		if (finger[i] != cid && (finger[i] == wanted || inInterval(finger[i], cid, wanted)))
+		if (finger[i] != cid && (finger[i] == wanted || inInterval(wanted, finger[i], cid)))
 			return finger[i];
 	}
 	return finger[0];
@@ -100,7 +100,9 @@ void node(int rank)
 			printf("Node %d : received TAGSEARCH message.\n", cid);
 						
 			/* If this node is responsible of the key */
-			if (ring_compare(key, cid, K)){
+							        				
+				/* It's not the responsible node, transmit */	
+			if (key == cid){
 				printf("\nNode %d is responsible for the key %d\n\n", cid, key);
 				chord_id = find_resp_finger(fingers, caller_chord, cid);
 				dest = find_corresponding_mpi_id(chord_id,
@@ -109,15 +111,18 @@ void node(int rank)
 				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 				SEND_INT(dest, TAGFOUND, cid);
 				SEND_INT(dest, TAGFOUND, caller_chord);
-	        				
-				/* It's not the responsible node, transmit */	
 			} else {
 				chord_id = find_resp_finger(fingers, key, cid);
 				dest = find_corresponding_mpi_id(chord_id,
 								 associative_table);
 				printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
-				SEND_INT(dest, TAGSEARCH, key);
-				SEND_INT(dest, TAGSEARCH, caller_chord);
+				if(chord_id = fingers[0]){
+					SEND_INT(dest, TAGANSWER, key);
+					SEND_INT(dest, TAGANSWER, caller_chord);
+				} else {
+					SEND_INT(dest, TAGSEARCH, key);
+					SEND_INT(dest, TAGSEARCH, caller_chord);
+				}
 			}
 			break;
 
@@ -139,9 +144,25 @@ void node(int rank)
 				dest = find_corresponding_mpi_id(chord_id,
 								 associative_table);
 				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
+				
 				SEND_INT(dest, TAGFOUND, key);
 				SEND_INT(dest, TAGFOUND, caller_chord);
+				
 			}
+			break;
+		case TAGANSWER:
+			MPI_Recv(&caller_chord, 1, MPI_INT, status.MPI_SOURCE,
+				 TAGANSWER, MPI_COMM_WORLD, &status);
+			printf("Node %d : received TAGANSWER message.\n", cid);
+			
+			printf("\nNode %d is responsible for the key %d\n\n", cid, key);
+			chord_id = find_resp_finger(fingers, caller_chord, cid);
+			dest = find_corresponding_mpi_id(chord_id,
+							 associative_table);
+			printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
+			printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
+			SEND_INT(dest, TAGFOUND, cid);
+			SEND_INT(dest, TAGFOUND, caller_chord);
 			break;
 
 		case TAGINIT:
