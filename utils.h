@@ -10,6 +10,7 @@ enum Tags {
 	TAGFOUND, /* Sending back the result of the search */
 	TAGELECT, /* Choosing a leader for the election */
 	TAGANN, /* Annoucing the leader at the end of the election */
+	TAGANSWER,
 	TAGTAB, /* Collecting all the node ids */
 	TAGTABANN, /* Broadcasting the completed table with all the node ids */
 	TAGTELLFINGER, /* Searching for a finger */
