@@ -245,7 +245,8 @@ void simulateur(void)
 		
 		/* Calcul de la finger table de i */
 		for(j = 0; j < M; j++){
-			val = (chord_id[i] + pow(2, j));
+			val = (chord_id[i] + (1 << j))
+				;
 			val = val % K;
        
 			int tmp = K, min = K, l, n;
