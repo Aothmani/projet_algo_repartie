@@ -280,7 +280,7 @@ void simulateur(void)
 	}
 
 	val = rand() % K;
-	i = rand() % M + 1;
+	i = rand() % NB_SITE + 1;
 	SEND_INT(i, TAGINIT, val);
 
 	MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);

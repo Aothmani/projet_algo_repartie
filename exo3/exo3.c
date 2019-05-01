@@ -3,7 +3,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <mpi.h>
-#include "utils.h"
+#include "../utils.h"
 
 #define NB_SITE 7 /* site simulateur inclus */
 #define M 6
@@ -78,18 +78,18 @@ int tri(const void * c, const void * d)
 void node(int rank)
 {
 	/* cid : chord id, key : buffer, sent in a message, caller : initiatior */
-	int cid, key, dest, wanted, chord_id, caller_chord, i, found;
+	int cid, key, dest, wanted, chord_id, caller_chord, i, j, found, node;
 	MPI_Status status;
-	int fingers[M], associative_table[NB_SITE+1], buff[2];
+	int fingers[M], tmp_fingers[M], associative_table[NB_SITE+1], buff[2];
 	
 	
 	/* Initialisation */
 	MPI_Recv(&cid, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
 	if (rank != NB_SITE){
 		MPI_Recv(&fingers, M, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
-		MPI_Recv(&associative_table, NB_SITE+1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
 	}
-		
+	MPI_Recv(&associative_table, NB_SITE+1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
+			
 	MPI_Recv(&buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 	while(status.MPI_TAG != TAGTERM){
 		switch (status.MPI_TAG){
@@ -172,10 +172,8 @@ void node(int rank)
 				SEND_INT(0, TAGTERM, key);
 			} else {
 				printf("Node %d is initiator, searching for key %d\n", cid, key);
-				chord_id = find_resp_finger(fingers, key, cid);
-				
-				dest = find_corresponding_mpi_id(chord_id,
-								 associative_table);
+				chord_id = find_resp_finger(fingers, key, cid);				
+				dest = find_corresponding_mpi_id(chord_id, associative_table);
 				printf("Calculated mpi rank from %d : %d\n", chord_id, dest);
 				printf("Transmitting the request to node %d\n", chord_id);
 
@@ -184,20 +182,58 @@ void node(int rank)
 				SEND_NINT(dest, TAGSEARCH, buff, 2);
 			}
 			break;
-		case TAGINS:
-			int val;
+		case TAGINSERT:
+			node = buff[0];
+			printf("Node %d : received TAGINSERT message.\n", cid);
+
+			chord_id = find_resp_finger(fingers, node, cid);
+			dest = find_corresponding_mpi_id(chord_id, associative_table);
+
+			printf("Node %d : asking help to node %d. Sending message\n", cid, node);
+
+			buff[0] = cid;
+			SEND_INT(dest, TAGASKFINGER, buff);
+			break;
+
+		case TAGASKFINGER:
+			node = buff[0];
 			for (i = 0; i < M; i++){
-				val = (1 << i);
-				chord_id = find_resp_finger(fingers, val, cid);
-				dest = find_corresponding_mpi_id(chord_id,
-								 associative_table);
-				SEND_INT(
-					}
-					break;
-			default:
-				printf("Error : unknown tag.\n");
-				break;
+				key = (node + (1 << i)) % K;
+				
+				chord_id = find_resp_finger(fingers, key, cid);				
+				dest = find_corresponding_mpi_id(chord_id, associative_table);
+				printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
+
+				buff[0] = key;
+				buff[1] = cid;
+				SEND_NINT(dest, TAGSEARCH, buff, 2);
+
+				MPI_Recv(&buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
+				/*
+				 * if this node is found as a finger of the node to insert,
+				 * add it to the finger table and update his reverse table
+				 */
+				if (status.MPI_TAG == TAGANSWER){
+					tmp_fingers[i] = cid;
+					j = 0;
+					while (reverse[j] != cid && reverse[j] != -1)
+						j++;
+					if (reverse[j] == -1)
+						reverse = cid;
+			        /* 
+				 * else add the node received to the finger table 
+				 * and send a message to him to update his reverse table 
+				 */ 
+				} else {
+					tmp_fingers[i] = buff[0];
+				}
 			}
+			break;
+
+		default:
+			printf("Error : unknown tag.\n");
+			break;
+		}
 		MPI_Recv(&buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 	}
 	printf("Node %d : TAGTERM received, terminating\n", rank);
@@ -315,13 +351,18 @@ void simulateur(void)
 		printf("\n");
 	}
 	
-	for(i = 1; i < NB_SITE + 1; i++){
+	for(i = 1; i < NB_SITE; i++){
 		SEND_INT(i, TAGINIT, chord_id[i]);
 		SEND_NINT(i, TAGINIT, finger[i], M);
 		SEND_NINT(i, TAGINIT, associative_table[i], NB_SITE+1);
 	}
 
-	SEND_INT(NB_SITE + 1, TAGINS, 0);
+	/* Send his id and associative table to the node to insert */
+	SEND_INT(NB_SITE, TAGINIT, chord_id[NB_SITE]);
+	SEND_NINT(NB_SITE, TAGINIT, chord_id, NB_SITE + 1);
+	
+	i = rand() % (NB_SITE - 1) + 1;
+	SEND_INT(NB_SITE, TAGINSERT, chord_id[i]);
 
 	MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);
 	for (i = 1; i < NB_SITE + 1; i++)
