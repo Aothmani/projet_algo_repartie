@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <mpi.h>
 
+#include "election.h"
 #include "utils.h"
 
 void test_send(void) {
@@ -60,17 +61,45 @@ void test_in_interval(void)
 	int k = 64;
 	int a = 1, b = 2, c = 34, d = 63;
 
-	assert(in_interval(2, a, b, k));
+	assert(in_interval(1, a, b, k));
 	assert(in_interval(12, a, c, k));
 	assert(in_interval(43, b, a, k));
 	assert(!in_interval(12, c, a, k));
 	assert(in_interval(12, a, d, k));
-	assert(in_interval(63, a, d, k));
+	assert(in_interval(62, a, d, k));
+}
+
+void print_fingers(int rank, struct node_addr fingers[], int size)
+{
+	int i;
+	printf("P%d> ", rank);
+	for (i = 0; i < size; i++) {
+		printf("%d, ", fingers[i].chord);
+	}
+	printf("\n");
+}
+
+
+void test_calc_fingers(void)
+{
+	int rank = 2;
+	struct node_addr tab[6] = {{1, 0}, {2, 1}, {3, 2}, {4, 3}, {5, 4}, {6, 6}};
+	struct node_addr fingers[6];
+
+	calc_fingers(rank, tab, 6, fingers, 6);
+	print_fingers(rank, fingers, 6);
+	assert(fingers[0].chord == 3 && fingers[1].chord == 4
+	       && fingers[2].chord == 6 && fingers[3].chord == 0
+	       && fingers[5].chord == 0);
 }
 
 int main(int argc, char *argv[])
 {
 	int proc_count, rank;
+
+	test_in_interval();
+	test_calc_fingers();
+	
 	MPI_Init(&argc, &argv);
 	MPI_Comm_size(MPI_COMM_WORLD, &proc_count);
 
@@ -83,7 +112,6 @@ int main(int argc, char *argv[])
 	else {
 		//test_receive();
 		test_receive_array();
-		test_in_interval();
 	}
 	
 	  

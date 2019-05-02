@@ -4,3 +4,6 @@ chord
 #*
 ex2
 test_ex2
+*.pdf
+*.tex
+*.org

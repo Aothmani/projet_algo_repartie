@@ -7,8 +7,8 @@
 #include "utils.h"
 #include "election.h"
 
-#define PROC_COUNT 6
-#define M 6
+#define PROC_COUNT 8
+#define M 8
 #define K (1 << M)
 
 #define MSWAP(a, b) {typeof(a) swap_#a#b;	\
@@ -25,12 +25,35 @@ void swap(int *a, int *b)
 	*a = c;
 }
 
-void sequence_array(int *arr, size_t len)
+void sequence_array(int *arr, int len, int max)
 {
-	size_t i;
+        int i, j;
+	int *done;
+	int val = 0;
+	int unique = 0;
+	done = malloc(len * sizeof(int));
+	for (i = 0; i < len; i++)
+		done[i] = -1;
+
 	for (i = 0; i < len; i++) {
-		arr[i] = i;
+		unique = 0;
+		while (!unique) {
+			val = rand() % max;
+			unique = 1;
+			for (j = 0; j < len; j++) {
+				if (val == done[j]){
+					unique = 0;
+					break;
+				} else if (done[j] == -1) {
+					break;
+				}
+				
+			}
+		}
+		arr[i] = val;
+		done[i] = val;
 	}
+	free(done);
 }
 
 void init_node(struct node *node)
@@ -58,7 +81,6 @@ void print_array(struct array* arr) {
 void node(int rank)
 {
 	struct node node;
-	int next;
 	MPI_Status status;
 	int elect_state, leader = -1;
 	int reception = 0;
@@ -130,18 +152,18 @@ void shuffle(int *arr, size_t len)
 
 void simulator(void)
 {
-	int mpi_ranks[M] = {1, 2, 3, 4, 5, 6};
+	int mpi_ranks[M] = {1, 2, 3, 4, 5, 6, 7, 8};
 	int chord_ids[M];
         int i, next;
 	int leader;
 	int one = 1, zero = 0;
 	struct node_addr next_addr;
-
+	
 	printf("Starting simulator process\n");
 	
 	/* Randomize chords ids */
-	sequence_array(chord_ids, M);
-	shuffle(chord_ids, M);
+	sequence_array(chord_ids, M, K);
+	chord_ids[5] = 27;
 
 	printf("Simulator, shuffle => ");
 	for (i = 0; i < M; i++) {

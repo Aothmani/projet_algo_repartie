@@ -51,7 +51,6 @@ void receive_tabann(struct node* node, int leader, int *reception);
  * @fingers output finger table
  * @fingerCnt size of finger table
  */
-void calc_fingers(int rank, struct node_addr* tab, int size,
-		  struct node_addr *fingers, int fingerCnt);
+void calc_fingers(struct node *node, struct node_addr* tab, int size);
 
 #endif /* CHORD_ELECTION_H */

@@ -19,7 +19,7 @@ void receive_elect(struct node *node, int *elect_state, int *leader)
 	int mpi_rank = node->mpi_rank;
 	struct node_addr addr;
 	addr.mpi = mpi_rank;
-	addr.chord = node->mpi_rank;
+	addr.chord = node->rank;
 	
 	MPI_Recv(&j, 1, MPI_INT, MPI_ANY_SOURCE, TAGELECT, MPI_COMM_WORLD,
 		 &status);
@@ -110,19 +110,19 @@ void receive_tabann(struct node* node, int leader, int *reception)
 	if (leader != ELECT_LEADER) {
 		send_addr_array(node->next_addr.mpi, TAGTABANN, tab, msize);
 	}
-	calc_fingers(node->mpi_rank, tab, msize, node->fingers->data,
-		     node->fingers->size);
-
+	calc_fingers(node, tab, msize);
+	
 	free(tab);
 }
 
-void calc_fingers(int rank, struct node_addr* tab, int size,
-		  struct node_addr *fingers, int fingerCnt)
+void calc_fingers(struct node *node, struct node_addr* tab, int size)
 {
-	int posp = 0, pos = 0, prev;
-	int i, fi = 0;
-	int htableSize = (1 << fingerCnt); /* 2^fingerCnt */
-	int fingerOffset;
+	int posp = 0, pos = 0;
+	int i = 0, fi = 0;
+	int htableSize = (1 << node->fingers->size); /* 2^fingerCnt */
+	int fingerOffset = 1;
+	int rank = node->rank;
+	int fingerCnt = node->fingers->size;
 	
 	/* 
 	 * Find the position of the current node inside the array that contains 
@@ -135,18 +135,22 @@ void calc_fingers(int rank, struct node_addr* tab, int size,
 		}
 	}
 
-	printf("P%d> calc_fingers - size = %d\n", rank, size);
-	printf("P%d> posp = %d, tab[posp] = %d\n", rank, posp, tab[posp].chord);
+	printf("P%d> calc_fingers - size = %d\n", node->mpi_rank, size);
+	printf("P%d> posp = %d, tab[posp] = %d\n", node->mpi_rank, posp,
+	       tab[posp].chord);
 	
-	/* TODO: Check algorithm */
 	pos = (posp + 1) % size;
 	fingerOffset = 1;
 	while (fi < fingerCnt) {
-		while (in_interval(pos, rank, rank + fingerOffset, htableSize))
+		while (in_interval(tab[pos].chord, rank,
+				   (rank + fingerOffset) % htableSize,
+				   htableSize)) {
+		        if (pos == posp)
+				break;
 			pos = (pos + 1) % size;
-		prev = (pos + size - 1) % size;
-		fingers[fi] = tab[prev];
+		}
+		node->fingers->data[fi] = tab[pos];
 		fi++;
-		fingerOffset *= 2;		
+		fingerOffset *= 2;
 	}	
 }
