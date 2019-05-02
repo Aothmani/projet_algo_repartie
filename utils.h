@@ -54,6 +54,7 @@ struct array {
 	struct node_addr data[0];
 };
 
+int in_interval(int n, int a, int b, int k);
 void receive_addr(int tag, struct node_addr* addr);
 void send_addr(int dest, int tag, struct node_addr* addr);
 
@@ -79,5 +80,6 @@ struct node {
  */
 
 int ring_compare(int a, int b, int m);
+
 
 #endif // CHORD_CONSTANTS

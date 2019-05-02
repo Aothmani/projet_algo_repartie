@@ -1,6 +1,14 @@
 #include "utils.h"
 
 
+int in_interval(int n, int a, int b, int k)
+{
+	if (a < b)
+		return (n >= a && n < b);
+	else
+		return ((n >= a && n < k) || (n >= 0 && n < b));
+}
+
 void receive_addr(int tag, struct node_addr* addr)
 {
 	int data[2];

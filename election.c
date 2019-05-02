@@ -136,29 +136,17 @@ void calc_fingers(int rank, struct node_addr* tab, int size,
 	}
 
 	printf("P%d> calc_fingers - size = %d\n", rank, size);
+	printf("P%d> posp = %d, tab[posp] = %d\n", rank, posp, tab[posp].chord);
 	
 	/* TODO: Check algorithm */
-	pos = (posp + 1) % size; /* id of next node */
+	pos = (posp + 1) % size;
 	fingerOffset = 1;
-	while (fi < fingerCnt) {	       
-		while (tab[i].chord > (posp + fingerOffset) % htableSize) {
-			prev = ((pos - 1) + size) % size;
-			fingers[fi] = tab[prev];
-			fi++;
-			fingerOffset <<= 1;			
-		}
-		pos = (pos + 1) % size;
-	}
-
-
-	
-	while (ring_compare(pos, posp, htableSize)) {
-		/* check if the node is in the finger table */
-		if (tab[pos].chord > (pos + htableSize) % size) {
-			prev = ((pos - 1) + size) % size;
-			fingers[fi] = tab[prev];
-			fi++;
-		}
-		pos = (pos + 1) % size;
-	}
+	while (fi < fingerCnt) {
+		while (in_interval(pos, rank, rank + fingerOffset, htableSize))
+			pos = (pos + 1) % size;
+		prev = (pos + size - 1) % size;
+		fingers[fi] = tab[prev];
+		fi++;
+		fingerOffset *= 2;		
+	}	
 }

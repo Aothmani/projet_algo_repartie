@@ -54,6 +54,20 @@ void test_receive_array(void) {
 	       && addr_array[1].mpi == 2 && addr_array[1].chord == 12);
 }
 
+
+void test_in_interval(void)
+{
+	int k = 64;
+	int a = 1, b = 2, c = 34, d = 63;
+
+	assert(in_interval(2, a, b, k));
+	assert(in_interval(12, a, c, k));
+	assert(in_interval(43, b, a, k));
+	assert(!in_interval(12, c, a, k));
+	assert(in_interval(12, a, d, k));
+	assert(in_interval(63, a, d, k));
+}
+
 int main(int argc, char *argv[])
 {
 	int proc_count, rank;
@@ -69,6 +83,7 @@ int main(int argc, char *argv[])
 	else {
 		//test_receive();
 		test_receive_array();
+		test_in_interval();
 	}
 	
 	  
