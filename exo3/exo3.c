@@ -78,9 +78,10 @@ int tri(const void * c, const void * d)
 void node(int rank)
 {
 	/* cid : chord id, key : buffer, sent in a message, caller : initiatior */
-	int cid, key, dest, wanted, chord_id, caller_chord, i, j, found, node;
+	int cid, key, dest, wanted, chord_id, caller_chord, i, j, found, node, new_node;
 	MPI_Status status;
-	int fingers[M], tmp_fingers[M], associative_table[NB_SITE+1], buff[2];
+	int fingers[M], tmp_fingers[M], associative_table[NB_SITE+1];
+	int buff[2], reverse[NB_SITE+1], tmp_reverse[NB_SITE+1];
 	
 	
 	/* Initialisation */
@@ -88,7 +89,8 @@ void node(int rank)
 	if (rank != NB_SITE){
 		MPI_Recv(&fingers, M, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
 	}
-	MPI_Recv(&associative_table, NB_SITE+1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
+	MPI_Recv(&associative_table, NB_SITE + 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
+	MPI_Recv(&reverse, NB_SITE + 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
 			
 	MPI_Recv(&buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 	while(status.MPI_TAG != TAGTERM){
@@ -115,10 +117,12 @@ void node(int rank)
 				chord_id = find_resp_finger(fingers, key, cid);
 				dest = find_corresponding_mpi_id(chord_id, associative_table);
 
-				printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
+
 				if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
+					printf("Node %d : transmitting the request TAGANSWER to node %d fo key %d\n", cid, chord_id, key);
 					SEND_NINT(dest, TAGANSWER, buff, 2);
 				} else {
+					printf("Node %d : transmitting the request TAGSEARCH to node %d\n", cid, chord_id);
 					SEND_NINT(dest, TAGSEARCH, buff, 2);
 				}
 			}
@@ -186,17 +190,19 @@ void node(int rank)
 			node = buff[0];
 			printf("Node %d : received TAGINSERT message.\n", cid);
 
-			chord_id = find_resp_finger(fingers, node, cid);
-			dest = find_corresponding_mpi_id(chord_id, associative_table);
+			dest = find_corresponding_mpi_id(node, associative_table);
 
-			printf("Node %d : asking help to node %d. Sending message\n", cid, node);
+			printf("Node %d : asking help to node %d\n", cid, node);
 
 			buff[0] = cid;
-			SEND_INT(dest, TAGASKFINGER, buff);
+			SEND_NINT(dest, TAGASKFINGER, buff, 2);
 			break;
 
 		case TAGASKFINGER:
+		{
+			printf("Node %d : received TAGASKFINGER message.\n", cid);
 			node = buff[0];
+			int node_mpi =  status.MPI_SOURCE;
 			for (i = 0; i < M; i++){
 				key = (node + (1 << i)) % K;
 				
@@ -206,30 +212,108 @@ void node(int rank)
 
 				buff[0] = key;
 				buff[1] = cid;
-				SEND_NINT(dest, TAGSEARCH, buff, 2);
-
+				if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0])
+					SEND_NINT(dest, TAGANSWER, buff, 2);
+				else
+					SEND_NINT(dest, TAGSEARCH, buff, 2);
+				
 				MPI_Recv(&buff, 2, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 				/*
 				 * if this node is found as a finger of the node to insert,
 				 * add it to the finger table and update his reverse table
 				 */
-				if (status.MPI_TAG == TAGANSWER){
+				if (status.MPI_TAG == TAGANSWER)
 					tmp_fingers[i] = cid;
-					j = 0;
-					while (reverse[j] != cid && reverse[j] != -1)
-						j++;
-					if (reverse[j] == -1)
-						reverse = cid;
-			        /* 
-				 * else add the node received to the finger table 
-				 * and send a message to him to update his reverse table 
-				 */ 
-				} else {
+
+				/* else add the node received to the finger table */ 
+				else if (status.MPI_TAG == TAGFOUND)
 					tmp_fingers[i] = buff[0];
+				else
+					printf("Node %d : error while constructing the finger table : wrong tag\n", cid);
+			}
+
+			SEND_INT(node_mpi, TAGGIVEFINGER,node);
+			SEND_NINT(node_mpi, TAGGIVEFINGER, tmp_fingers, M);
+			break;
+		}
+
+		case TAGGIVEFINGER:
+			MPI_Recv(&fingers, M, MPI_INT, MPI_ANY_SOURCE, TAGGIVEFINGER, MPI_COMM_WORLD, &status);
+			printf("Node %d : received TAGGIVEFINGER message\n", cid);
+			printf("\nNode %d : received finger table : \n\n", cid);
+
+			for (i = 0; i < M; i++){
+				printf("Node %d : finger[%d] = %d\n", cid, i, fingers[i]);
+				dest = find_corresponding_mpi_id(fingers[i], associative_table);
+				SEND_INT(dest, TAGNEWREVERSE, cid);
+			}
+
+			SEND_INT(0, TAGTERM, fingers[0]);
+			dest = find_corresponding_mpi_id(fingers[0], associative_table);
+			SEND_INT(dest, TAGCHECKREVERSE, cid);
+
+		case TAGNEWREVERSE:
+			node = buff[0];
+			i = 0;
+			while(reverse[i] != node && reverse[i] != -1)
+				i++;
+			if(reverse[i] == -1){
+				reverse[i] = node;
+				printf("Node %d : new reverse added : node %d\n", cid, buff[0]);
+			}
+			
+			break;
+			
+		case TAGCHECKREVERSE:
+			printf("Node %d : received TAGCHECKREVERSE message from %d\n", cid, buff[0]);
+			node = buff[0];
+			i = 0;
+			while (i < M && reverse[i] != -1){
+				dest = find_corresponding_mpi_id(reverse[i], associative_table);
+				
+				buff[0] = cid;
+				buff[1] = node;
+				SEND_NINT(dest, TAGMODIFYFINGER, buff, 2);
+				i++;
+			}
+			break;
+				
+		case TAGMODIFYFINGER:
+			printf("Node %d : received TAGMODIFYFINGER message from %d\n", cid, buff[1]);
+			node = buff[0];
+			new_node = buff[1];
+		
+			i = 0;
+			while (i < M && fingers[i] != node)
+				i++;
+
+			key = cid + (1 << i);
+			printf("Node %d : node = %d new_node = %d key = %d\n", cid, node, new_node, key);
+			if (key <= new_node){
+				fingers[i] = new_node;
+				printf("Node %d : modified finger table : node %d replaced with node %d for key %d\n",cid, node, new_node, key);
+				dest = find_corresponding_mpi_id(node, associative_table);
+				SEND_INT(dest, TAGDELETEREVERSE, cid);
+
+				dest = find_corresponding_mpi_id(new_node, associative_table);
+				SEND_INT(dest, TAGNEWREVERSE, cid);
+			}
+
+			for(i = 0; i < M; i++)
+				printf("Node %d : finger[%d] = %d\n", cid, i, fingers[i]);
+			printf("\n");
+			SEND_INT(0, TAGTERM, cid);
+			break;
+
+		case TAGDELETEREVERSE:
+			for (i = 0; i < NB_SITE + 1; i++){
+				if(reverse[i] == buff[0]){
+					printf("Node %d : deleted node %d from reverse table\n", cid, reverse[i]);
+					reverse[i] = -1;
 				}
 			}
 			break;
-
+			
 		default:
 			printf("Error : unknown tag.\n");
 			break;
@@ -246,7 +330,7 @@ void simulateur(void)
 
 	int chord_id[NB_SITE + 1];
 	int finger[NB_SITE + 1][M], associative_table[NB_SITE + 1][NB_SITE+1], reverse[NB_SITE+1][NB_SITE+1];
-	int i, val, j, k, l;
+	int i, val, j, k, l, m, cpt;
 	
 	for(i = 0; i < NB_SITE + 1; i++)
 		chord_id[i] = -1;
@@ -329,6 +413,7 @@ void simulateur(void)
 		for(j = 0; j < M; j++){
 			/* we search if the finger already exists in the reverse */
 			while (l < NB_SITE){
+				/* get the index of the finger in the chord_id table */
 				if (chord_id[l] == finger[i][j])
 					break;
 				l++;
@@ -338,6 +423,7 @@ void simulateur(void)
 			/* if not, add it */
 			if (reverse[l][k] == -1){
 				reverse[l][k] = chord_id[i];
+				associative_table[l][i] = chord_id[i];
 			}
 			k = 0;
 			l = 1;
@@ -351,20 +437,43 @@ void simulateur(void)
 		printf("\n");
 	}
 	
+/*	for(i = 1; i < NB_SITE + 1; i++){
+		for(j = 0; j < NB_SITE + 1; j++){
+			printf("Node %d : associative_table[%d] = %d\n", chord_id[i], j, associative_table[i][j]);
+		}
+		printf("\n");
+	}
+*/	
 	for(i = 1; i < NB_SITE; i++){
 		SEND_INT(i, TAGINIT, chord_id[i]);
 		SEND_NINT(i, TAGINIT, finger[i], M);
 		SEND_NINT(i, TAGINIT, associative_table[i], NB_SITE+1);
+		SEND_NINT(i, TAGINIT, reverse[i], NB_SITE+1);
 	}
 
 	/* Send his id and associative table to the node to insert */
 	SEND_INT(NB_SITE, TAGINIT, chord_id[NB_SITE]);
 	SEND_NINT(NB_SITE, TAGINIT, chord_id, NB_SITE + 1);
+	SEND_NINT(NB_SITE, TAGINIT, reverse[NB_SITE], NB_SITE + 1);
 	
 	i = rand() % (NB_SITE - 1) + 1;
 	SEND_INT(NB_SITE, TAGINSERT, chord_id[i]);
 
 	MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);
+	printf("Simulator : received node %d\n", val);
+
+	i = 0;
+	while (i < NB_SITE && chord_id[i] != val)
+		i++;
+
+	j = 0;
+	while (j < NB_SITE + 1 && reverse[i][j] != -1){
+		j++;
+	}
+	printf("Simulator : cpt = %d\n", j);
+
+	for (i = 0; i < j; i++)
+		MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);
 	for (i = 1; i < NB_SITE + 1; i++)
 		SEND_INT(i, TAGTERM, val);
 }

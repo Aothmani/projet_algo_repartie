@@ -13,14 +13,17 @@ enum Tags {
 	TAGANSWER,
 	TAGTAB, /* Collecting all the node ids */
 	TAGTABANN, /* Broadcasting the completed table with all the node ids */
-	TAGTTELLFINGER, /* Searching for a finger */
-	TAGTELLFINGERRESP, /* Response to TAGTELLFINGER from the new finger */
+	TAGASKFINGER, /* Searching for a finger */
+	TAGGIVEFINGER, /* Response to TAGASKFINGER from the new finger */
+	TAGNEWREVERSE, /* Signals each concerned node to add the new inserted one in their reverse */
+	TAGCHECKREVERSE, /* Sent by the newly inserted node to his finger[0] to eventually modify the finger table of the other nodes */
+	TAGMODIFYFINGER,
+	TAGDELETEREVERSE,
 	TAGUPDATE, /* Tell a node to update its fingers in regards to the newly inserted node */
 	TAGUPDATERESP, /* Response to TAGTELLFINGER, contains the new finger */
 	TAGINSERT, /* Insert a node in the ring */
 	TAGINSERTRESP, /* Response of TAGINSERT, indicate that the node has been inserted in the ring */
 	TAGTERM, /* Terminate a node */
-	TAGASKFINGER,
 };
 
 /* SEND_INT - send an integer to a given node 
@@ -56,7 +59,6 @@ struct array {
 	struct node_addr data[0];
 };
 
-int in_interval(int n, int a, int b, int k);
 void receive_addr(int tag, struct node_addr* addr);
 void send_addr(int dest, int tag, struct node_addr* addr);
 
@@ -82,6 +84,5 @@ struct node {
  */
 
 int ring_compare(int a, int b, int m);
-
 
 #endif // CHORD_CONSTANTS
