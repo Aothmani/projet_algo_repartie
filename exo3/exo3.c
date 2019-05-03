@@ -5,7 +5,7 @@
 #include <mpi.h>
 #include "../utils.h"
 
-#define NB_SITE 7 /* site simulateur inclus */
+#define NB_SITE 7 /* site simulateur non inclus */
 #define M 6
 #define K (1 << M)
 
@@ -102,29 +102,17 @@ void node(int rank)
 			
 			printf("Node %d : received TAGSEARCH message.\n", cid);
 
-			if (key == cid){
-				printf("\nNode %d is responsible for the key %d\n\n", cid, key);
 			
-				chord_id = find_resp_finger(fingers, caller_chord, cid);
-				dest = find_corresponding_mpi_id(chord_id, associative_table);
-				printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
-				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
-			
-				buff[0] = cid;
-				SEND_NINT(dest, TAGFOUND, buff, 2);
+			chord_id = find_resp_finger(fingers, key, cid);
+			dest = find_corresponding_mpi_id(chord_id, associative_table);
+
+
+			if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
+				printf("Node %d : transmitting the request TAGANSWER to node %d fo key %d\n", cid, chord_id, key);
+				SEND_NINT(dest, TAGANSWER, buff, 2);
 			} else {
-		        
-				chord_id = find_resp_finger(fingers, key, cid);
-				dest = find_corresponding_mpi_id(chord_id, associative_table);
-
-
-				if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
-					printf("Node %d : transmitting the request TAGANSWER to node %d fo key %d\n", cid, chord_id, key);
-					SEND_NINT(dest, TAGANSWER, buff, 2);
-				} else {
-					printf("Node %d : transmitting the request TAGSEARCH to node %d\n", cid, chord_id);
-					SEND_NINT(dest, TAGSEARCH, buff, 2);
-				}
+				printf("Node %d : transmitting the request TAGSEARCH to node %d\n", cid, chord_id);
+				SEND_NINT(dest, TAGSEARCH, buff, 2);
 			}
 			break;
 
@@ -150,23 +138,16 @@ void node(int rank)
 			caller_chord = buff[1];
 			
 			printf("Node %d : received TAGFOUND message.\n", cid);
-			/*
-			 * The init node received the resp id,
-			 * send terminate message to simulator
-			 */
-			if(caller_chord == cid){
-				printf("Node %d : received node number %d responsible for the key. End of algorithm\n\n", cid, key);
-				SEND_INT(0, TAGTERM, key);
+				
+			/* this node is not the recipient, transmit */
+			
+			chord_id = find_resp_finger(fingers, caller_chord, cid);
+			dest = find_corresponding_mpi_id(chord_id,
+							 associative_table);
+			printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 
-				/* this node is not the recipient, transmit */
-			} else {
-				chord_id = find_resp_finger(fingers, caller_chord, cid);
-				dest = find_corresponding_mpi_id(chord_id,
-								 associative_table);
-				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
-
-				SEND_NINT(dest, TAGFOUND, buff, 2);			
-			}
+			SEND_NINT(dest, TAGFOUND, buff, 2);			
+			
 			break;
 
 		case TAGINIT:
