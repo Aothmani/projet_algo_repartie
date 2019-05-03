@@ -98,28 +98,15 @@ void node(int rank)
 			caller_chord = buff[1];
 			
 			printf("Node %d : received TAGSEARCH message.\n", cid);
-
-			if (key == cid){
-				printf("\nNode %d is responsible for the key %d\n\n", cid, key);
-			
-				chord_id = find_resp_finger(fingers, caller_chord, cid);
-				dest = find_corresponding_mpi_id(chord_id, associative_table);
-				printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
-				printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
-			
-				buff[0] = cid;
-				SEND_NINT(dest, TAGFOUND, buff, 2);
-			} else {
 		        
-				chord_id = find_resp_finger(fingers, key, cid);
-				dest = find_corresponding_mpi_id(chord_id, associative_table);
+			chord_id = find_resp_finger(fingers, key, cid);
+			dest = find_corresponding_mpi_id(chord_id, associative_table);
 
-				printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
-				if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
-					SEND_NINT(dest, TAGANSWER, buff, 2);
-				} else {
-					SEND_NINT(dest, TAGSEARCH, buff, 2);
-				}
+			printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
+			if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
+				SEND_NINT(dest, TAGANSWER, buff, 2);
+			} else {
+				SEND_NINT(dest, TAGSEARCH, buff, 2);
 			}
 			break;
 
@@ -135,7 +122,7 @@ void node(int rank)
 			printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
 			printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 
-			buff[0] = cid;
+		
 			SEND_NINT(dest, TAGFOUND, buff, 2);
 
 			break;
