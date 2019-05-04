@@ -61,8 +61,10 @@ void init_node(struct node *node)
 	MPI_Status status;
 	MPI_Recv(&node->rank, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD, &status);
 	receive_addr(TAGINIT, &node->next_addr);
+	receive_addr(TAGINIT, &node->left_addr);
 	MPI_Recv(&node->leader, 1, MPI_INT, 0, TAGINIT, MPI_COMM_WORLD,
 		 &status);
+	
 }
 
 void print_fingers(struct node_addr* fingers, int len)
@@ -82,10 +84,12 @@ void node(int rank)
 {
 	struct node node;
 	MPI_Status status;
-	int elect_state, leader = -1;
+	int elect_state = ELECT_NOTCANDIDATE, leader = -1;
 	int reception = 0;
 	struct node_addr addr;
-
+	int k = 0;
+	int cpt = 0;
+	
 	printf("P%d> Starting node\n", rank);
 	
 	node.mpi_rank = rank;
@@ -105,8 +109,8 @@ void node(int rank)
 	
 	if (node.leader) {
 		printf("P%d> Is leader\n", rank);
-		election(rank, node.next_addr.mpi);
 		elect_state = ELECT_CANDIDATE;
+		election(&node, &k);
 	}
 
 	while (!reception) {
@@ -116,8 +120,7 @@ void node(int rank)
 		switch (status.MPI_TAG) {
 		case TAGELECT:
 			printf("TAGELECT\n");
-			receive_elect(&node, &elect_state,
-				      &leader);
+			receive_elect(&node, &elect_state, &leader, &cpt, &k);
 			break;
 		case TAGTAB:
 			printf("TAGTAB\n");
@@ -154,10 +157,10 @@ void simulator(void)
 {
 	int mpi_ranks[M] = {1, 2, 3, 4, 5, 6, 7, 8};
 	int chord_ids[M];
-        int i, next;
+        int i, next, left;
 	int leader;
 	int one = 1, zero = 0;
-	struct node_addr next_addr;
+	struct node_addr next_addr, left_addr;
 	
 	printf("Starting simulator process\n");
 	
@@ -173,13 +176,18 @@ void simulator(void)
 
 	leader = rand() % M;
 	
-	/* Send chords ids and mpi ids for next nodes */
+	/* Send chords ids and mpi ids for adjacent nodes */
 	for (i = 0; i < M; i++) {
 		SEND_INT(mpi_ranks[i], TAGINIT, chord_ids[i]);
 		next = (i + 1) % M;
+		left = (i - 1) % M;
 		next_addr.mpi = next + FIRST_NODE;
 		next_addr.chord = chord_ids[next];
+
+		left_addr.mpi = left + FIRST_NODE;
+		left_addr.chord = left + FIRST_NODE;
 		send_addr(mpi_ranks[i], TAGINIT, &next_addr);
+		send_addr(mpi_ranks[i], TAGINIT, &left_addr);
 		if (i == leader)
 			SEND_INT(mpi_ranks[i], TAGINIT, one);
 		else

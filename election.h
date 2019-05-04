@@ -15,12 +15,13 @@ enum ElectState {
  * @rank initator rank
  * @next rank of next node in the ring
  */
-void election(int rank, int next);
+void election(struct node* node, int *k);
 
 /* receive_elect - Handle the reception of a TAGELECT message during an 
  * election using the Chang & Roberts algorithm 
  */
-void receive_elect(struct node *node, int *elect_state, int *leader);
+void receive_elect(struct node *node, int *elect_state, int *leader, int *cpt,
+		   int *k);
 
 /* receive_tab - handle the reception of a TAGTAB message
  * If the current node initiated the sequence, it will intiate the TAGTABANN 
