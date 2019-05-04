@@ -72,7 +72,8 @@ void send_addr_array(int dest, int tag, struct node_addr* addr_array,
 struct node {
 	int mpi_rank; 
 	int rank; /* id in the ring */
-        struct node_addr next_addr; /* next node in the ring */
+        struct node_addr next_addr; /* right node in the ring */
+	struct node_addr left_addr; /* left node in the ring */
 	int leader; /* 1 if leader, 0 otherwise */
 	struct array *fingers;
 };

@@ -6,37 +6,80 @@
 #include "election.h"
 #include "utils.h"
 
+#define LEFT 1
+#define RIGHT 2
 
-void election(int rank, int next)
+#define OPP(dir) (dir == LEFT ? RIGHT : LEFT)
+#define DIRN(dir, node) (dir == LEFT ? node->left_addr.mpi : node->next_addr.mpi)
+
+
+void election(struct node* node, int *k)
 {
-	SEND_INT(next, TAGELECT, rank);
+	int data[2];
+	data[0] = node->mpi_rank;
+	data[1] = (1 << *k);
+	SEND_NINT(DIRN(LEFT, node), TAGELECT, data, 2);
+	SEND_NINT(DIRN(RIGHT, node), TAGELECT, data, 2);
 }
 
-void receive_elect(struct node *node, int *elect_state, int *leader)
+void receive_elect(struct node *node, int *elect_state, int *leader, int *cpt,
+		   int *k)
 {
-	int j;
+	int j, ttl;
+	int data[2];
 	MPI_Status status;
-	int mpi_rank = node->mpi_rank;
+	int mpi_rank = node->mpi_rank;	
+	int dir;
 	struct node_addr addr;
 	addr.mpi = mpi_rank;
 	addr.chord = node->rank;
 	
-	MPI_Recv(&j, 1, MPI_INT, MPI_ANY_SOURCE, TAGELECT, MPI_COMM_WORLD,
+	MPI_Recv(data, 2, MPI_INT, MPI_ANY_SOURCE, TAGELECT, MPI_COMM_WORLD,
 		 &status);
 	
-	if (mpi_rank > j) {
-		if (*elect_state == ELECT_NOTCANDIDATE)
-			*elect_state = ELECT_CANDIDATE;
-		SEND_INT(node->next_addr.mpi, TAGELECT, mpi_rank);
-	} else if (mpi_rank < j) {
-		*elect_state = ELECT_LOST;
-		*leader = j;
-		SEND_INT(node->next_addr.mpi, TAGELECT, j);
-	} else {
-		*elect_state = ELECT_LEADER;
-		send_addr_array(node->next_addr.mpi, TAGTAB, &addr, 1);
+	if (status.MPI_SOURCE == node->next_addr.mpi)
+		dir = LEFT;
+	else
+		dir = RIGHT;
+	
+	j = data[0];
+	ttl = data[1];
+
+	printf("P%d> (ttl: %d, j: %d)\n", node->mpi_rank, ttl, j);
+
+	if (*elect_state == ELECT_NOTCANDIDATE) {
+		SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
+	} else if (mpi_rank == j) {
+		if (ttl > 0) {
+			*elect_state = ELECT_LEADER;
+			printf("P%d> leader\n", node->mpi_rank);
+			send_addr_array(node->next_addr.mpi, TAGTAB, &addr, 1);
+		}
+	} else if (j > mpi_rank && ttl >= 1) {
+		*elect_state = ELECT_LOST;  
+		data[0] = *leader = j;
+		printf("P%d> lost", node->mpi_rank);
+		if (ttl > 1) {
+			data[1] = ttl - 1;
+			SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
+		} else {
+			data[1] = 0;
+			SEND_NINT(DIRN(OPP(dir), node), TAGELECT, data, 2);
+		}		
+	} else if (ttl == 0){ 
+		if (mpi_rank != j) {
+			SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
+		} else {
+			(*cpt)++;
+			if (*cpt == 2 && *elect_state != ELECT_LOST) {
+				(*k)++;
+				*cpt = 0;
+				election(node, k);
+			}				
+		}		
 	}
 }
+
 
 int __compare_int(const void* a, const void* b)
 {
