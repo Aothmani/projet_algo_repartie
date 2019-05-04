@@ -100,7 +100,7 @@ void node(int rank)
 			key = buff[0];
 			caller_chord = buff[1];
 			
-			printf("Node %d : received TAGSEARCH message.\n", cid);
+			//			printf("Node %d : received TAGSEARCH message.\n", cid);
 
 			
 			chord_id = find_resp_finger(fingers, key, cid);
@@ -108,10 +108,10 @@ void node(int rank)
 
 
 			if (chord_id == key || inInterval(key, cid, fingers[0]) && chord_id == fingers[0]){
-				printf("Node %d : transmitting the request TAGANSWER to node %d fo key %d\n", cid, chord_id, key);
+				//				printf("Node %d : transmitting the request TAGANSWER to node %d fo key %d\n", cid, chord_id, key);
 				SEND_NINT(dest, TAGANSWER, buff, 2);
 			} else {
-				printf("Node %d : transmitting the request TAGSEARCH to node %d\n", cid, chord_id);
+				//			printf("Node %d : transmitting the request TAGSEARCH to node %d\n", cid, chord_id);
 				SEND_NINT(dest, TAGSEARCH, buff, 2);
 			}
 			break;
@@ -120,13 +120,13 @@ void node(int rank)
 			key = buff[0];
 			caller_chord = buff[1];
 			
-			printf("Node %d : received TAGANSWER message.\n", cid);
-			printf("\nNode %d is responsible for the key %d\n\n", cid, key);
+			//	printf("Node %d : received TAGANSWER message.\n", cid);
+			printf("Node %d is responsible for the key %d\n", cid, key);
 			
 			chord_id = find_resp_finger(fingers, caller_chord, cid);
 			dest = find_corresponding_mpi_id(chord_id, associative_table);
-			printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
-			printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
+			//	printf("Node %d : sending answer to caller %d\n", cid, caller_chord);
+			//	printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 
 			buff[0] = cid;
 			SEND_NINT(dest, TAGFOUND, buff, 2);
@@ -137,39 +137,22 @@ void node(int rank)
 			key = buff[0];
 			caller_chord = buff[1];
 			
-			printf("Node %d : received TAGFOUND message.\n", cid);
+			//	printf("Node %d : received TAGFOUND message.\n", cid);
 				
 			/* this node is not the recipient, transmit */
 			
 			chord_id = find_resp_finger(fingers, caller_chord, cid);
 			dest = find_corresponding_mpi_id(chord_id,
 							 associative_table);
-			printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
+			//	printf("Node %d : transmitting the answer to node %d\n", cid, chord_id);
 
 			SEND_NINT(dest, TAGFOUND, buff, 2);			
 			
 			break;
 
-		case TAGINIT:
-			key = buff[0];			
-			if(key == cid){
-				printf("Init : key wanted is the init node, no need for research.\n");
-				SEND_INT(0, TAGTERM, key);
-			} else {
-				printf("Node %d is initiator, searching for key %d\n", cid, key);
-				chord_id = find_resp_finger(fingers, key, cid);				
-				dest = find_corresponding_mpi_id(chord_id, associative_table);
-				printf("Calculated mpi rank from %d : %d\n", chord_id, dest);
-				printf("Transmitting the request to node %d\n", chord_id);
-
-				buff[0] = key;
-				buff[1] = cid;
-				SEND_NINT(dest, TAGSEARCH, buff, 2);
-			}
-			break;
 		case TAGINSERT:
 			node = buff[0];
-			printf("Node %d : received TAGINSERT message.\n", cid);
+			printf("Node %d needs to be inserted.\n\n", cid);
 
 			dest = find_corresponding_mpi_id(node, associative_table);
 
@@ -181,7 +164,7 @@ void node(int rank)
 
 		case TAGASKFINGER:
 		{
-			printf("Node %d : received TAGASKFINGER message.\n", cid);
+			//	printf("Node %d : received TAGASKFINGER message.\n\n", cid);
 			node = buff[0];
 			int node_mpi =  status.MPI_SOURCE;
 			for (i = 0; i < M; i++){
@@ -189,7 +172,7 @@ void node(int rank)
 				
 				chord_id = find_resp_finger(fingers, key, cid);				
 				dest = find_corresponding_mpi_id(chord_id, associative_table);
-				printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
+				//	printf("Node %d : transmitting the request to node %d\n", cid, chord_id);
 
 				buff[0] = key;
 				buff[1] = cid;
@@ -220,19 +203,25 @@ void node(int rank)
 
 		case TAGGIVEFINGER:
 			MPI_Recv(&fingers, M, MPI_INT, MPI_ANY_SOURCE, TAGGIVEFINGER, MPI_COMM_WORLD, &status);
-			printf("Node %d : received TAGGIVEFINGER message\n", cid);
+			//	printf("\nNode %d : received TAGGIVEFINGER message\n", cid);
 			printf("\nNode %d : received finger table : \n\n", cid);
 
 			for (i = 0; i < M; i++){
-				printf("Node %d : finger[%d] = %d\n", cid, i, fingers[i]);
-				dest = find_corresponding_mpi_id(fingers[i], associative_table);
-				SEND_INT(dest, TAGNEWREVERSE, cid);
+				printf("Node %d : finger[%d] = %d for key %d\n", cid, i, fingers[i], (cid + (1 << i)) % K);
+				/* Send message to add this node as a reverse to his fingers
+				 * The "if" is here to avoid sending useless messages 
+				 */
+				if (i == 0 || fingers[i] != fingers[i-1]) {
+					dest = find_corresponding_mpi_id(fingers[i], associative_table);
+					SEND_INT(dest, TAGNEWREVERSE, cid);
+				}
 			}
-
-			SEND_INT(0, TAGTERM, fingers[0]);
+			printf("\n");
+			
 			dest = find_corresponding_mpi_id(fingers[0], associative_table);
 			SEND_INT(dest, TAGCHECKREVERSE, cid);
-
+			break;
+			
 		case TAGNEWREVERSE:
 			node = buff[0];
 			i = 0;
@@ -246,10 +235,10 @@ void node(int rank)
 			break;
 			
 		case TAGCHECKREVERSE:
-			printf("Node %d : received TAGCHECKREVERSE message from %d\n", cid, buff[0]);
+			//	printf("Node %d : received TAGCHECKREVERSE message from %d\n", cid, buff[0]);
 			node = buff[0];
 			i = 0;
-			while (i < M && reverse[i] != -1){
+			while (i < NB_SITE + 1 && reverse[i] != -1){
 				dest = find_corresponding_mpi_id(reverse[i], associative_table);
 				
 				buff[0] = cid;
@@ -257,42 +246,55 @@ void node(int rank)
 				SEND_NINT(dest, TAGMODIFYFINGER, buff, 2);
 				i++;
 			}
+			dest = status.MPI_SOURCE;
+			j = 0;
+			while (j < i - 1) {
+				MPI_Recv(&buff, 1, MPI_INT, MPI_ANY_SOURCE, TAGDONE, MPI_COMM_WORLD, &status);
+				j++;
+			}
+
+			printf("Node %d : all modifications done, sending end message to the newly inserted node %d\n", cid, node);
+			SEND_INT(dest, TAGEND, buff);
+			
 			break;
 				
 		case TAGMODIFYFINGER:
-			printf("Node %d : received TAGMODIFYFINGER message from %d\n", cid, buff[1]);
+			//	printf("Node %d : received TAGMODIFYFINGER message from %d\n", cid, buff[0]);
 			node = buff[0];
 			new_node = buff[1];
 		
 			i = 0;
-			while (i < M && fingers[i] != node)
+			while (i < M) {
+				if (fingers[i] == node) {
+					key = cid + (1 << i);
+					if (key <= new_node){
+						fingers[i] = new_node;
+						printf("Node %d : modified finger[%d] : node %d replaced with node %d for key %d\n",cid, i, node, new_node, key);
+						if (i == 0 || fingers[i - 1] != fingers[i]) {
+							dest = find_corresponding_mpi_id(node, associative_table);
+							SEND_INT(dest, TAGDELETEREVERSE, cid);
+
+							dest = find_corresponding_mpi_id(new_node, associative_table);
+							SEND_INT(dest, TAGNEWREVERSE, cid);
+						}
+					}
+				}
 				i++;
-
-			key = cid + (1 << i);
-			printf("Node %d : node = %d new_node = %d key = %d\n", cid, node, new_node, key);
-			if (key <= new_node){
-				fingers[i] = new_node;
-				printf("Node %d : modified finger table : node %d replaced with node %d for key %d\n",cid, node, new_node, key);
-				dest = find_corresponding_mpi_id(node, associative_table);
-				SEND_INT(dest, TAGDELETEREVERSE, cid);
-
-				dest = find_corresponding_mpi_id(new_node, associative_table);
-				SEND_INT(dest, TAGNEWREVERSE, cid);
 			}
-
-			for(i = 0; i < M; i++)
-				printf("Node %d : finger[%d] = %d\n", cid, i, fingers[i]);
-			printf("\n");
-			SEND_INT(0, TAGTERM, cid);
+			SEND_INT(status.MPI_SOURCE, TAGDONE, cid);
 			break;
 
 		case TAGDELETEREVERSE:
 			for (i = 0; i < NB_SITE + 1; i++){
 				if(reverse[i] == buff[0]){
-					printf("Node %d : deleted node %d from reverse table\n", cid, reverse[i]);
+					printf("Node %d : deleted node %d from reverse table, his finger table was updated\n", cid, reverse[i]);
 					reverse[i] = -1;
 				}
 			}
+			break;
+
+		case TAGEND:
+			SEND_INT(0, TAGTERM, buff); 
 			break;
 			
 		default:
@@ -340,11 +342,6 @@ void simulateur(void)
 		chord_id[i] = val;
 	}
 
-	printf("\nChord id array :\n\n");
-	for (i = 0; i < NB_SITE + 1; i++)
-		printf("chord_id[%d] = %d\n", i, chord_id[i]);
-	printf("\n");
-	
 	qsort(chord_id + 1, NB_SITE, sizeof(int), tri);
 
 	printf("Sorted chord id array :\n\n");
@@ -402,7 +399,7 @@ void simulateur(void)
 			while (k < NB_SITE && reverse[l][k] != -1 && reverse[l][k] != chord_id[i])
 				k++;
 			/* if not, add it */
-			if (reverse[l][k] == -1){
+			if (chord_id[i] != finger[i][j] && reverse[l][k] == -1){
 				reverse[l][k] = chord_id[i];
 				associative_table[l][i] = chord_id[i];
 			}
@@ -417,14 +414,7 @@ void simulateur(void)
 		}
 		printf("\n");
 	}
-	
-/*	for(i = 1; i < NB_SITE + 1; i++){
-		for(j = 0; j < NB_SITE + 1; j++){
-			printf("Node %d : associative_table[%d] = %d\n", chord_id[i], j, associative_table[i][j]);
-		}
-		printf("\n");
-	}
-*/	
+
 	for(i = 1; i < NB_SITE; i++){
 		SEND_INT(i, TAGINIT, chord_id[i]);
 		SEND_NINT(i, TAGINIT, finger[i], M);
@@ -436,25 +426,13 @@ void simulateur(void)
 	SEND_INT(NB_SITE, TAGINIT, chord_id[NB_SITE]);
 	SEND_NINT(NB_SITE, TAGINIT, chord_id, NB_SITE + 1);
 	SEND_NINT(NB_SITE, TAGINIT, reverse[NB_SITE], NB_SITE + 1);
-	
+
+	/* Send the insertion message and the node who will help him to the node to insert  */
 	i = rand() % (NB_SITE - 1) + 1;
 	SEND_INT(NB_SITE, TAGINSERT, chord_id[i]);
 
-	MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);
-	printf("Simulator : received node %d\n", val);
-
-	i = 0;
-	while (i < NB_SITE && chord_id[i] != val)
-		i++;
-
-	j = 0;
-	while (j < NB_SITE + 1 && reverse[i][j] != -1){
-		j++;
-	}
-	printf("Simulator : cpt = %d\n", j);
-
-	for (i = 0; i < j; i++)
-		MPI_Recv(&val, 1, MPI_INT, MPI_ANY_SOURCE, TAGTERM, MPI_COMM_WORLD, NULL);
+	/* Waiting for the terminate message from the node to insert, and send the terminate messages  */
+	MPI_Recv(&val, 1, MPI_INT, NB_SITE, TAGTERM, MPI_COMM_WORLD, NULL);
 	for (i = 1; i < NB_SITE + 1; i++)
 		SEND_INT(i, TAGTERM, val);
 }

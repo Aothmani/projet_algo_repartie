@@ -19,6 +19,8 @@ enum Tags {
 	TAGCHECKREVERSE, /* Sent by the newly inserted node to his finger[0] to eventually modify the finger table of the other nodes */
 	TAGMODIFYFINGER,
 	TAGDELETEREVERSE,
+	TAGDONE,
+	TAGEND,
 	TAGUPDATE, /* Tell a node to update its fingers in regards to the newly inserted node */
 	TAGUPDATERESP, /* Response to TAGTELLFINGER, contains the new finger */
 	TAGINSERT, /* Insert a node in the ring */
