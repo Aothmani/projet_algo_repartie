@@ -5,7 +5,7 @@ all: chord
 chord: chord.o utils.o
 	mpicc -g $^ -lm -o $@
 
-ex2: ex2.o utils.o election.o 
+ex2: exo2/ex2.o utils.o exo2/election.o 
 	mpicc -g $^ -lm -o $@
 
 test: test.o chord.o utils.o
