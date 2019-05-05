@@ -45,25 +45,27 @@ void receive_elect(struct node *node, int *elect_state, int *leader, int *cpt,
 	j = data[0];
 	ttl = data[1];
 
-	printf("P%d> (ttl: %d, j: %d)\n", node->mpi_rank, ttl, j);
+	printf("P%d> (ttl: %d, j: %d), cpt = %d, k = %d\n",
+	       node->mpi_rank, ttl, j, *cpt, *k);
 
 	if (*elect_state == ELECT_NOTCANDIDATE) {
+		printf("P%d> not candidate\n", node->mpi_rank);
 		SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
-	} else if (mpi_rank == j) {
-		if (ttl > 0) {
-			*elect_state = ELECT_LEADER;
-			printf("P%d> leader\n", node->mpi_rank);
-			send_addr_array(node->next_addr.mpi, TAGTAB, &addr, 1);
-		}
+	} else if (mpi_rank == j && ttl > 0) {
+		*elect_state = ELECT_LEADER;
+		printf("P%d> leader\n", node->mpi_rank);
+		send_addr_array(node->next_addr.mpi, TAGTAB, &addr, 1);
 	} else if (j > mpi_rank && ttl >= 1) {
 		*elect_state = ELECT_LOST;  
 		data[0] = *leader = j;
-		printf("P%d> lost", node->mpi_rank);
+		printf("P%d> lost\n", node->mpi_rank);
 		if (ttl > 1) {
 			data[1] = ttl - 1;
 			SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
 		} else {
 			data[1] = 0;
+			printf("P%d> opp = %d\n",
+			       node->mpi_rank, DIRN(OPP(dir), node));
 			SEND_NINT(DIRN(OPP(dir), node), TAGELECT, data, 2);
 		}		
 	} else if (ttl == 0){ 
@@ -74,6 +76,8 @@ void receive_elect(struct node *node, int *elect_state, int *leader, int *cpt,
 			if (*cpt == 2 && *elect_state != ELECT_LOST) {
 				(*k)++;
 				*cpt = 0;
+				printf("P%d> starting new step (k = %d, cpt = %d)\n",
+				       node->mpi_rank, *k, *cpt);
 				election(node, k);
 			}				
 		}		

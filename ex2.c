@@ -101,8 +101,9 @@ void node(int rank)
 	
 	init_node(&node);
 
-	printf("P%d> Chord rank = %d, next = (%d, %d)\n",
-	       rank, node.rank, node.next_addr.mpi, node.next_addr.chord);
+	printf("P%d> Chord rank = %d, next = (%d, %d), left = (%d, %d)\n",
+	       rank, node.rank, node.next_addr.mpi, node.next_addr.chord,
+	       node.left_addr.mpi, node.left_addr.chord);
 	
 	addr.chord = node.rank;
 	addr.mpi = node.mpi_rank;
@@ -158,7 +159,7 @@ void simulator(void)
 	int mpi_ranks[M] = {1, 2, 3, 4, 5, 6, 7, 8};
 	int chord_ids[M];
         int i, next, left;
-	int leader;
+	int leader, candidate = 0;
 	int one = 1, zero = 0;
 	struct node_addr next_addr, left_addr;
 	
@@ -180,18 +181,29 @@ void simulator(void)
 	for (i = 0; i < M; i++) {
 		SEND_INT(mpi_ranks[i], TAGINIT, chord_ids[i]);
 		next = (i + 1) % M;
-		left = (i - 1) % M;
+		left = (i - 1 + M) % M;
 		next_addr.mpi = next + FIRST_NODE;
 		next_addr.chord = chord_ids[next];
 
 		left_addr.mpi = left + FIRST_NODE;
-		left_addr.chord = left + FIRST_NODE;
+		left_addr.chord = chord_ids[left];;
 		send_addr(mpi_ranks[i], TAGINIT, &next_addr);
 		send_addr(mpi_ranks[i], TAGINIT, &left_addr);
-		if (i == leader)
+
+		
+		if (i == leader) {
 			SEND_INT(mpi_ranks[i], TAGINIT, one);
-		else
-			SEND_INT(mpi_ranks[i], TAGINIT, zero);
+		}
+		else {
+			/* Each non leader node has a 1/4 chance of being 
+			 * candidate 
+			 */
+			candidate = (rand() % 4) == 0;
+			if (candidate)
+				SEND_INT(mpi_ranks[i], TAGINIT, one);
+			else
+				SEND_INT(mpi_ranks[i], TAGINIT, zero);
+		}
 	}	
 }
 
