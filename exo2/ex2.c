@@ -4,7 +4,7 @@
 #include <time.h>
 #include <string.h>
 
-#include "utils.h"
+#include "../utils.h"
 #include "election.h"
 
 #define PROC_COUNT 8

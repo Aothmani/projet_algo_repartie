@@ -3,7 +3,7 @@
 #include <mpi.h>
 
 #include "election.h"
-#include "utils.h"
+#include "../utils.h"
 
 void test_send(void) {
 	struct node_addr addr;

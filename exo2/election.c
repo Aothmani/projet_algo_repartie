@@ -4,7 +4,7 @@
 #include <stdio.h>
 
 #include "election.h"
-#include "utils.h"
+#include "../utils.h"
 
 #define LEFT 1
 #define RIGHT 2

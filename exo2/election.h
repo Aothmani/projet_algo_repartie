@@ -1,7 +1,7 @@
 #ifndef CHORD_ELECTION_H
 #define CHORD_ELECTION_H
 
-#include "utils.h"
+#include "../utils.h"
 
 enum ElectState {
 		 ELECT_CANDIDATE, /* node is candidate for leadership */
