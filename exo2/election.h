@@ -12,8 +12,8 @@ enum ElectState {
 
 /* 
  * election - Initiate a leader election using the Chang & Roberts algorithm
- * @rank initator rank
- * @next rank of next node in the ring
+ * @node current node
+ * @k kth step
  */
 void election(struct node* node, int *k);
 
@@ -46,11 +46,9 @@ void receive_tabann(struct node* node, int leader, int *reception);
 
 /* calc_fingers - Calculate the finger table using list 
  * of all nodes in the network
- * @rank CHORD id of current node
- * @tab array that contains the CHORD ids of every node in the network
- * @size array size
- * @fingers output finger table
- * @fingerCnt size of finger table
+ * @node current node
+ * @tab table that contains the addresses of all the nodes in the ring
+ * @size size of tab
  */
 void calc_fingers(struct node *node, struct node_addr* tab, int size);
 

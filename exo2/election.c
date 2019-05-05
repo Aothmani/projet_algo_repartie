@@ -9,7 +9,10 @@
 #define LEFT 1
 #define RIGHT 2
 
+/* Get the opposite direction */
 #define OPP(dir) (dir == LEFT ? RIGHT : LEFT)
+
+/* Get the left/right neighbor of a node given a specified direction */
 #define DIRN(dir, node) (dir == LEFT ? node->left_addr.mpi : node->next_addr.mpi)
 
 
@@ -71,7 +74,7 @@ void receive_elect(struct node *node, int *elect_state, int *leader, int *cpt,
 	} else if (ttl == 0){ 
 		if (mpi_rank != j) {
 			SEND_NINT(DIRN(dir, node), TAGELECT, data, 2);
-		} else {
+		} else { /* the messages returns to an initiator */
 			(*cpt)++;
 			if (*cpt == 2 && *elect_state != ELECT_LOST) {
 				(*k)++;
@@ -110,6 +113,7 @@ void receive_tab(struct node_addr* addr, struct node_addr* next, int leader)
 	int msize;
 	int i;
 	
+	/* Get the length of the sent array */
 	MPI_Probe(MPI_ANY_SOURCE, TAGTAB, MPI_COMM_WORLD, &status);
 	MPI_Get_count(&status, MPI_INT, &msize);
 	tab = malloc((msize + 1) * sizeof(int));
@@ -121,13 +125,13 @@ void receive_tab(struct node_addr* addr, struct node_addr* next, int leader)
 	}
 	printf("]\n");
 	
-	if (leader) {
+	if (leader) { /* The phase has been completed */
 		qsort((void*)tab, msize, sizeof(struct node_addr),
 		      __compare_addr);
-		send_addr_array(next->mpi, TAGTABANN, tab, msize);
-	} else {
+		send_addr_array(next->mpi, TAGTABANN, tab, msize); 
+	} else {		
 		tab[msize] = *addr;
-		msize++;
+		msize++;	       
 		send_addr_array(next->mpi, TAGTAB, tab, msize);
 	}
 	free(tab);
@@ -139,7 +143,8 @@ void receive_tabann(struct node* node, int leader, int *reception)
 	int msize;
 	int i;
 	MPI_Status status;
-	
+
+	/* Get the length of the sent array */
 	MPI_Probe(MPI_ANY_SOURCE, TAGTABANN, MPI_COMM_WORLD, &status);
 	MPI_Get_count(&status, MPI_INT, &msize);
 	
@@ -185,14 +190,17 @@ void calc_fingers(struct node *node, struct node_addr* tab, int size)
 	printf("P%d> calc_fingers - size = %d\n", node->mpi_rank, size);
 	printf("P%d> posp = %d, tab[posp] = %d\n", node->mpi_rank, posp,
 	       tab[posp].chord);
-	
+
+	/* Calculate the finger table */
 	pos = (posp + 1) % size;
 	fingerOffset = 1;
 	while (fi < fingerCnt) {
 		while (in_interval(tab[pos].chord, rank,
 				   (rank + fingerOffset) % htableSize,
 				   htableSize)) {
-		        if (pos == posp)
+
+			/* If the node is in his own finger table */
+		        if (pos == posp) 
 				break;
 			pos = (pos + 1) % size;
 		}

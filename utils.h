@@ -80,14 +80,6 @@ struct node {
 	struct array *fingers;
 };
 
-/*
- * find_finger - Determines the finger to which the request should be 
- * transmitted to
- * @fingers finger table
- * @m size of finger table
- * @wanted wanted value
- */
-
 int ring_compare(int a, int b, int m);
 
 #endif // CHORD_CONSTANTS

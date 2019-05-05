@@ -85,7 +85,7 @@ void node(int rank)
 	struct node node;
 	MPI_Status status;
 	int elect_state = ELECT_NOTCANDIDATE, leader = -1;
-	int reception = 0;
+	int finished = 0;
 	struct node_addr addr;
 	int k = 0;
 	int cpt = 0;
@@ -98,7 +98,7 @@ void node(int rank)
 	node.fingers->size = M;
 	
 	memset(node.fingers->data, 0, sizeof(struct node_addr) * M);
-	
+
 	init_node(&node);
 
 	printf("P%d> Chord rank = %d, next = (%d, %d), left = (%d, %d)\n",
@@ -114,11 +114,13 @@ void node(int rank)
 		election(&node, &k);
 	}
 
-	while (!reception) {
+	while (!finished) {
+		/* Wait for a message */
 		MPI_Probe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
 		printf("P%d> Received message from %d, tag = ",
 		       rank, status.MPI_SOURCE);
-		switch (status.MPI_TAG) {
+		/* Handle the reception */
+		switch (status.MPI_TAG) { 
 		case TAGELECT:
 			printf("TAGELECT\n");
 			receive_elect(&node, &elect_state, &leader, &cpt, &k);
@@ -130,7 +132,7 @@ void node(int rank)
 			break;
 		case TAGTABANN:
 			printf("TAGTABANN\n");
-			receive_tabann(&node, elect_state, &reception);
+			receive_tabann(&node, elect_state, &finished);
 			break;
 		default:
 			printf("Undefined message tag\n");
@@ -175,6 +177,7 @@ void simulator(void)
 	}
 	printf("\n");
 
+	/* We make sure that at least one node is a leader */
 	leader = rand() % M;
 	
 	/* Send chords ids and mpi ids for adjacent nodes */
@@ -196,7 +199,9 @@ void simulator(void)
 		}
 		else {
 			/* Each non leader node has a 1/4 chance of being 
-			 * candidate 
+			 * candidate, this means that there's a good chance
+			 * that more than 1 node will be a candidate for the
+			 * election
 			 */
 			candidate = (rand() % 4) == 0;
 			if (candidate)
