@@ -20,9 +20,7 @@ int inInterval(int n, int a, int b)
 			
 }
 
-/* Return the finger with the highest index such as it verifies
- * wanted in [finger, cid[
- */
+
 int find_resp_finger(const int * finger, int wanted, int cid)
 {
 	int i;

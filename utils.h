@@ -5,26 +5,28 @@
 #include <stdlib.h>
 
 enum Tags {
+	/* Exercice 1 */
 	TAGINIT, /* Sent by the simulator to define the variables */
 	TAGSEARCH, /* Searching a value in the hash table */
 	TAGFOUND, /* Sending back the result of the search */
 	TAGELECT, /* Choosing a leader for the election */
+
+	/* Exercice 2 */
 	TAGANN, /* Annoucing the leader at the end of the election */
 	TAGANSWER,
 	TAGTAB, /* Collecting all the node ids */
 	TAGTABANN, /* Broadcasting the completed table with all the node ids */
-	TAGASKFINGER, /* Searching for a finger */
-	TAGGIVEFINGER, /* Response to TAGASKFINGER from the new finger */
-	TAGNEWREVERSE, /* Signals each concerned node to add the new inserted one in their reverse */
-	TAGCHECKREVERSE, /* Sent by the newly inserted node to his finger[0] to eventually modify the finger table of the other nodes */
-	TAGMODIFYFINGER,
-	TAGDELETEREVERSE,
-	TAGDONE,
-	TAGEND,
-	TAGUPDATE, /* Tell a node to update its fingers in regards to the newly inserted node */
-	TAGUPDATERESP, /* Response to TAGTELLFINGER, contains the new finger */
-	TAGINSERT, /* Insert a node in the ring */
-	TAGINSERTRESP, /* Response of TAGINSERT, indicate that the node has been inserted in the ring */
+
+	/* Exercice 3 */
+	TAGINSERT, /* Telling a node to tinitiate the insertion by asking a node to help it */
+	TAGASKFINGER, /* Calculate the finger table and gives it to the new node */
+	TAGGIVEFINGER, /* Get the new finger table and ask for update */
+	TAGCHECKREVERSE, /* Ask to the reverses to check if they need to update their finger table  */
+	TAGMODIFYFINGER, /* Check if the finger 'node' need to be replaced with the new one */
+	TAGNEWREVERSE, /* Add a new reverse to the reverse table*/
+	TAGDELETEREVERSE, /* Delete a reverse from the reverse table  */
+	TAGDONE, /* Update of a reverse's finger table finished */
+	TAGEND, /* All system updated, signal it to the new node  */
 	TAGTERM, /* Terminate a node */
 };
 
